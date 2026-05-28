@@ -187,6 +187,7 @@ async fn execute_resource(
     match command {
         ResourceCommand::List(args) => execute_list(client, output, resource, args).await,
         ResourceCommand::Show(args) => {
+            validate_path_id(&format!("{} id", resource.label()), &args.id)?;
             let mut query = Vec::new();
             push_include(&mut query, args.include);
 
@@ -205,6 +206,7 @@ async fn execute_resource(
             render_value(output, Some(resource), &json)
         }
         ResourceCommand::EditTemplate(args) => {
+            validate_path_id(&format!("{} id", resource.label()), &args.id)?;
             let mut query = Vec::new();
             push_include(&mut query, args.include);
 
@@ -278,6 +280,7 @@ async fn execute_resource_update(
     let body = resource_payload(args.payload, true)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
+    validate_path_id(&format!("{} id", resource.label()), &args.id)?;
     let path = format!("api/v1/{}/{}", resource.path(), args.id);
 
     require_confirmation(&format!("{} update", resource.label()), &args.safety)?;
@@ -297,6 +300,7 @@ async fn execute_resource_delete(
     args: ConfirmableIdArgs,
 ) -> Result<String> {
     require_confirmation(&format!("{} delete", resource.label()), &args.safety)?;
+    validate_path_id(&format!("{} id", resource.label()), &args.id)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     let path = format!("api/v1/{}/{}", resource.path(), args.id);
@@ -316,6 +320,7 @@ async fn execute_resource_bulk(
     args: BulkArgs,
 ) -> Result<String> {
     require_confirmation(&format!("{} bulk action", resource.label()), &args.safety)?;
+    validate_path_ids(&format!("{} id", resource.label()), &args.ids)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     let body = bulk_action_body(args.action, args.ids, args.email_type);
@@ -339,6 +344,7 @@ async fn execute_resource_upload(
         &format!("{} document upload", resource.label()),
         &args.safety,
     )?;
+    validate_path_id(&format!("{} id", resource.label()), &args.id)?;
     for file in &args.files {
         ensure_upload_file(file)?;
     }
@@ -372,6 +378,7 @@ async fn execute_resource_action(
     args: ResourceActionArgs,
 ) -> Result<String> {
     require_confirmation(&format!("{} action", resource.label()), &args.safety)?;
+    validate_path_id(&format!("{} id", resource.label()), &args.id)?;
     validate_path_segment("resource action", &args.action)?;
     let body = resource_payload(args.payload, false)?;
     let mut query = Vec::new();
@@ -591,6 +598,7 @@ async fn execute_invoice_update(
         require_confirmation("invoice update with state-changing trigger", &args.safety)?;
     }
 
+    validate_path_id("invoice id", &args.id)?;
     let path = format!("api/v1/invoices/{}", args.id);
     if args.safety.dry_run {
         return render_dry_run("PUT", &path, &query, Some(&body), None);
@@ -606,6 +614,7 @@ async fn execute_invoice_delete(
     args: ConfirmableIdArgs,
 ) -> Result<String> {
     require_confirmation("invoice delete", &args.safety)?;
+    validate_path_id("invoice id", &args.id)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
 
@@ -624,6 +633,7 @@ async fn execute_invoice_bulk(
     args: BulkArgs,
 ) -> Result<String> {
     require_confirmation("invoice bulk action", &args.safety)?;
+    validate_path_ids("invoice id", &args.ids)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     let body = bulk_action_body(args.action, args.ids, args.email_type);
@@ -657,6 +667,7 @@ async fn execute_invoice_upload(
     args: UploadArgs,
 ) -> Result<String> {
     require_confirmation("invoice document upload", &args.safety)?;
+    validate_path_id("invoice id", &args.id)?;
     for file in &args.files {
         ensure_upload_file(file)?;
     }
@@ -679,6 +690,7 @@ async fn execute_invoice_action(
     args: InvoiceActionArgs,
 ) -> Result<String> {
     require_confirmation("invoice action", &args.safety)?;
+    validate_path_id("invoice id", &args.id)?;
     validate_path_segment("invoice action", &args.action)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
@@ -700,6 +712,7 @@ async fn execute_download(
 ) -> Result<String> {
     let mut query = Vec::new();
     push_include(&mut query, args.include);
+    validate_path_id("download id", &args.id)?;
     ensure_download_path(&args.output_file, args.force)?;
     write_download_file(
         &args.output_file,
@@ -765,6 +778,17 @@ async fn fetch_all_pages(
             "limit": limit,
         }
     }))
+}
+
+fn validate_path_id(label: &str, id: &str) -> Result<()> {
+    validate_path_segment(label, id)
+}
+
+fn validate_path_ids(label: &str, ids: &[String]) -> Result<()> {
+    for id in ids {
+        validate_path_id(label, id)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn write_download_file(path: &Path, bytes: Vec<u8>, force: bool) -> Result<()> {

@@ -64,8 +64,6 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    # Non-blocking: coverage failures don't sink the PR.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -87,4 +85,4 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
+          fail_ci_if_error: true

@@ -158,5 +158,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Skip crate publish without registry token
+        if: env.CARGO_REGISTRY_TOKEN == ''
+        run: echo "CARGO_REGISTRY_TOKEN is not configured; skipping crates.io publish."
+
       - name: Publish crate
+        if: env.CARGO_REGISTRY_TOKEN != ''
         run: cargo publish --locked
