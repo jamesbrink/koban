@@ -178,9 +178,12 @@ impl InvoiceTriggerArgs {
 
     pub(crate) fn requires_confirmation(&self) -> bool {
         self.send_email
+            || self.mark_sent
             || self.paid
             || self.amount_paid.is_some()
             || self.cancel
+            || self.save_default_footer
+            || self.save_default_terms
             || self.retry_e_send
     }
 }

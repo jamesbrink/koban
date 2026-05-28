@@ -673,6 +673,7 @@ fn invoice_create_posts_guided_payload_and_trigger_query() {
             "--mark-sent",
             "--include",
             "client",
+            "--yes",
         ])
         .assert()
         .success()
@@ -683,24 +684,27 @@ fn invoice_create_posts_guided_payload_and_trigger_query() {
 }
 
 #[test]
-fn invoice_create_send_email_requires_confirmation() {
-    koban()
-        .env("INVOICE_NINJA_API_TOKEN", "test-token")
-        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
-        .args([
-            "invoices",
-            "create",
-            "--client-id",
-            "client_1",
-            "--line-item",
-            "product_key=Consulting,quantity=1,cost=100",
-            "--send-email",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("confirmation required"))
-        .stderr(predicate::str::contains("--dry-run"))
-        .stderr(predicate::str::contains("--yes"));
+fn invoice_create_triggers_require_confirmation() {
+    for trigger in [
+        "--send-email",
+        "--mark-sent",
+        "--save-default-footer",
+        "--save-default-terms",
+    ] {
+        koban()
+            .env("INVOICE_NINJA_API_TOKEN", "test-token")
+            .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+            .args(["invoices", "create", "--client-id", "client_1"])
+            .args([
+                "--line-item",
+                "product_key=Consulting,quantity=1,cost=100",
+                trigger,
+            ])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("confirmation required"))
+            .stderr(predicate::str::contains("--yes"));
+    }
 }
 
 #[test]

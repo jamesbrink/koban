@@ -597,10 +597,7 @@ async fn execute_invoice_create(
     push_invoice_triggers(&mut query, &args.triggers);
 
     if args.triggers.requires_confirmation() {
-        require_confirmation(
-            "invoice create with email, paid, cancel, or retry action",
-            &args.safety,
-        )?;
+        require_confirmation("invoice create with state-changing trigger", &args.safety)?;
     }
 
     if args.safety.dry_run {
@@ -623,10 +620,7 @@ async fn execute_invoice_update(
     push_invoice_triggers(&mut query, &args.triggers);
 
     if args.triggers.requires_confirmation() {
-        require_confirmation(
-            "invoice update with email, paid, cancel, or retry action",
-            &args.safety,
-        )?;
+        require_confirmation("invoice update with state-changing trigger", &args.safety)?;
     }
 
     let path = format!("api/v1/invoices/{}", args.id);

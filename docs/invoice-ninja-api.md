@@ -235,8 +235,9 @@ Safety rules:
 - Generic endpoint runner payload flags are valid only with `POST` and `PUT`;
   `GET` and `DELETE` reject payloads instead of silently dropping request
   bodies.
-- `create` and `update` require `--yes` when they send email, mark paid, record
-  an amount paid, cancel, or retry e-send on invoice-specific commands.
+- `create` and `update` require `--yes` when invoice-specific triggers mark
+  sent, send email, mark paid, record an amount paid, cancel, save default
+  footer/terms, or retry e-send.
 - Mocked tests are required for every write path. Live write smoke tests must be
   explicitly opted in and should use the public demo endpoint.
 - `smoke-all-demo` is the repeatable full live smoke helper for the implemented
