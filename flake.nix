@@ -273,6 +273,48 @@
                 help = "safe live GET /api/v1/statics smoke test";
                 command = "cargo run -- statics \"$@\"";
               }
+              {
+                category = "run";
+                name = "smoke-invoice-write-demo";
+                help = "explicit demo-only invoice create/update/delete smoke test";
+                command = ''
+                  set -euo pipefail
+                  if [ "''${KOBAN_LIVE_WRITE_SMOKE:-}" != "1" ]; then
+                    echo "Set KOBAN_LIVE_WRITE_SMOKE=1 to run this mutating demo smoke test." >&2
+                    exit 2
+                  fi
+                  if [ "''${INVOICE_NINJA_BASE_URL:-}" != "https://demo.invoiceninja.com" ] || [ "''${INVOICE_NINJA_API_TOKEN:-}" != "TOKEN" ]; then
+                    echo "This helper only runs against https://demo.invoiceninja.com with token TOKEN." >&2
+                    exit 2
+                  fi
+
+                  client_id="$(
+                    cargo run -- --output json clients list --per-page 1 \
+                      | jq -r '.data[0].id // empty'
+                  )"
+                  if [ -z "$client_id" ]; then
+                    echo "No demo client was available for invoice write smoke testing." >&2
+                    exit 1
+                  fi
+
+                  invoice_id="$(
+                    cargo run -- --output json invoices create \
+                      --client-id "$client_id" \
+                      --line-item product_key=KobanSmoke,quantity=1,cost=1 \
+                      --private-notes "Koban demo write smoke" \
+                      | jq -r '.data.id // .id // empty'
+                  )"
+                  if [ -z "$invoice_id" ]; then
+                    echo "Invoice creation did not return an id." >&2
+                    exit 1
+                  fi
+
+                  cargo run -- --output json invoices update "$invoice_id" \
+                    --private-notes "Koban demo write smoke updated" >/dev/null
+                  cargo run -- --output json invoices delete "$invoice_id" --yes >/dev/null
+                  echo "Created, updated, and deleted demo invoice $invoice_id"
+                '';
+              }
             ];
           };
 

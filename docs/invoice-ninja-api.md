@@ -1,10 +1,10 @@
 # Invoice Ninja API Reference For Koban
 
 This document is Koban's working API reference. It is intentionally conservative
-because early development touches accounting APIs. Koban's current implemented
-surface should only perform read-only requests. Prefer the public demo API for
-live smoke tests, and use production or personal accounts only for intentional,
-non-destructive reads.
+because early development touches accounting APIs. Koban's implemented surface
+is read-first, with guarded invoice write commands. Prefer the public demo API
+for live smoke tests, and use production or personal accounts only for
+intentional checks.
 
 Last researched: 2026-05-28.
 
@@ -66,7 +66,7 @@ Notes:
 - `X-API-SECRET` is optional and only assessed on `/api/v1/login`.
 - Koban should load the token from `INVOICE_NINJA_API_TOKEN`.
 - Koban should default `INVOICE_NINJA_BASE_URL` to `https://invoicing.co`.
-- Local read-only smoke testing should prefer
+- Local smoke testing should prefer
   `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
   `INVOICE_NINJA_API_TOKEN=TOKEN`.
 - Never log request headers verbatim. Redact tokens and secrets in errors,
@@ -198,7 +198,49 @@ Treat search as read-like but not part of the first live smoke test because it
 uses `POST`. Add it once Koban has a request body model, a `--dry-run`
 convention, and fixtures around token redaction.
 
-## Write And Destructive Endpoints To Avoid Initially
+## Implemented Invoice Write Endpoints
+
+Invoice manipulation is the first implemented write family:
+
+```text
+POST /api/v1/invoices
+PUT /api/v1/invoices/{id}
+DELETE /api/v1/invoices/{id}
+POST /api/v1/invoices/bulk
+POST /api/v1/invoices/{id}/upload
+GET /api/v1/invoices/{id}/{action}
+```
+
+Create and update accept either one raw JSON source (`--data`, `--data-file`, or
+`--stdin`) or guided flags for common fields. Guided line items are repeatable
+`--line-item key=value,...` values and map to the API's `line_items` array.
+
+Invoice create/update may also send documented trigger query flags:
+
+```text
+send_email=true
+mark_sent=true
+paid=true
+amount_paid=<amount>
+cancel=true
+save_default_footer=true
+save_default_terms=true
+retry_e_send=true
+```
+
+Koban intentionally does not expose the documented `redirect` trigger.
+
+Safety rules:
+
+- Every invoice write supports `--dry-run`.
+- `delete`, `bulk`, `upload`, and `action` require `--yes` unless `--dry-run` is
+  used.
+- `create` and `update` require `--yes` when they send email, mark paid, record
+  an amount paid, cancel, or retry e-send.
+- Mocked tests are required for every write path. Live write smoke tests must be
+  explicitly opted in and should use the public demo endpoint.
+
+## Write And Destructive Endpoints To Avoid For Now
 
 Do not implement these until Koban has confirmation prompts, `--yes`, dry-run
 rendering, request validation, tests with a mock server, and clear docs:
@@ -211,12 +253,6 @@ POST /api/v1/clients/bulk
 POST /api/v1/clients/{id}/purge
 POST /api/v1/clients/{id}/{mergeable_client_hashed_id}/merge
 
-POST /api/v1/invoices
-PUT /api/v1/invoices/{id}
-DELETE /api/v1/invoices/{id}
-POST /api/v1/invoices/bulk
-POST /api/v1/invoices/{id}/upload
-
 POST /api/v1/payments
 PUT /api/v1/payments/{id}
 DELETE /api/v1/payments/{id}
@@ -226,9 +262,10 @@ POST /api/v1/payments/{id}/upload
 ```
 
 Some custom action endpoints may be harmless and others may send emails, archive
-records, reverse state, or otherwise mutate accounting data. Treat all custom,
-bulk, upload, merge, purge, refund, email, import, and scheduler endpoints as
-unsafe until individually audited.
+records, reverse state, or otherwise mutate accounting data. Outside the
+implemented invoice action surface, treat all custom, bulk, upload, merge,
+purge, refund, email, import, and scheduler endpoints as unsafe until
+individually audited.
 
 ## Invoice Statuses
 
@@ -250,7 +287,7 @@ values in JSON output.
 
 ## Implemented Starting Point
 
-The current implementation is a read-only API foundation:
+The current implementation is a guarded API foundation:
 
 1. A small HTTP client module with `base_url`, `api_token`, and default headers.
 2. Config loading from environment only:
@@ -262,17 +299,18 @@ The current implementation is a read-only API foundation:
 5. List pagination with `--page`, `--per-page`, `--all`, and `--limit`.
 6. Raw filtering and sorting with `--filter key=value` and `--sort field|dir`.
 7. Read-only invoice PDF downloads for invoice PDFs and delivery notes.
+8. Guarded invoice create/update/delete/bulk/upload/action commands.
 
 Safety rules for this milestone:
 
-- Only issue `GET` requests.
+- Read commands and downloads issue `GET` requests.
+- Invoice write commands require explicit payloads, `--dry-run` previews, and
+  `--yes` where the mutation is destructive or externally visible.
 - No automatic pagination across multiple pages unless `--all` is explicit.
-- No file uploads, no imports, no email endpoints, no bulk endpoints.
-- No command may mutate production data.
+- No imports, purge, refund, merge, scheduler, or unimplemented write families.
 - Live smoke tests should use the public demo endpoint by default:
   `https://demo.invoiceninja.com` with token `TOKEN`.
-- Production or personal accounts are acceptable only for intentional,
-  non-destructive read checks.
+- Production or personal accounts are acceptable only for intentional checks.
 - JSON output should be stable enough for AI agents.
 - Human table output should hide noisy raw fields by default.
 - Error output must redact `INVOICE_NINJA_API_TOKEN`.
@@ -291,6 +329,15 @@ koban invoices list --all --limit 100 --output json
 koban invoices show <invoice_id> --output json
 koban invoices template --output json
 koban invoices edit-template <invoice_id> --output json
+koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
+koban invoices create --data-file invoice.json --include client
+koban invoices update <invoice_id> --data-file invoice.json --dry-run
+koban invoices update <invoice_id> --public-notes "Thanks again" --mark-sent
+koban invoices delete <invoice_id> --dry-run
+koban invoices delete <invoice_id> --yes
+koban invoices bulk --action archive --id <invoice_id> --id <invoice_id> --dry-run
+koban invoices action <invoice_id> --action mark_paid --dry-run
+koban invoices upload <invoice_id> --file contract.pdf --dry-run
 koban invoices download <invitation_key> --output-file invoice.pdf
 koban invoices delivery-note <invoice_id> --output-file delivery-note.pdf
 koban payments list --page 1 --per-page 20 --output table
@@ -315,5 +362,5 @@ koban tasks list --all --limit 50
   envelope?
 - Should statics be cached on disk, and if so where should Koban keep cache files
   on macOS/Linux?
-- What are the first truly useful write workflows once read-only coverage is
-  stable: creating draft invoices, updating clients, or recording payments?
+- Which write family should follow invoices: clients, quotes, payments, or
+  task/project time workflows?

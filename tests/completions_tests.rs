@@ -23,7 +23,7 @@ fn completions_zsh_outputs_script() {
         .success()
         .stdout(predicate::str::contains("#compdef koban"))
         .stdout(predicate::str::contains(
-            "invoices:List, show, inspect, and download invoices",
+            "invoices:List, show, create, update, and manage invoices",
         ))
         .stdout(predicate::str::contains(
             "quotes:List, show, and inspect quotes",
@@ -121,6 +121,28 @@ fn dynamic_invoice_completions_include_download_commands() {
         .args(["--", "koban", "invoices", ""])
         .assert()
         .success()
+        .stdout(predicate::str::contains("create"))
+        .stdout(predicate::str::contains("update"))
+        .stdout(predicate::str::contains("delete"))
+        .stdout(predicate::str::contains("bulk"))
+        .stdout(predicate::str::contains("upload"))
+        .stdout(predicate::str::contains("action"))
         .stdout(predicate::str::contains("download"))
         .stdout(predicate::str::contains("delivery-note"));
+}
+
+#[test]
+fn dynamic_invoice_create_completions_include_write_flags() {
+    koban()
+        .env("COMPLETE", "bash")
+        .env("_CLAP_COMPLETE_INDEX", "3")
+        .args(["--", "koban", "invoices", "create", ""])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--data-file"))
+        .stdout(predicate::str::contains("--client-id"))
+        .stdout(predicate::str::contains("--line-item"))
+        .stdout(predicate::str::contains("--send-email"))
+        .stdout(predicate::str::contains("--dry-run"))
+        .stdout(predicate::str::contains("--yes"));
 }
