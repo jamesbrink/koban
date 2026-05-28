@@ -20,7 +20,7 @@ is intentionally a symlink to `AGENTS.md`; do not replace it with a copied file.
 
 ## Safety
 
-The implemented Invoice Ninja API commands must remain read-only unless explicitly requested for write support. Do not add or smoke test destructive, write,
+The implemented Invoice Ninja API commands must remain read-only unless explicitly requested for write support. Invoice download commands may save PDF bytes to explicit local paths, but must still use `GET`. Do not add or smoke test destructive, write,
 bulk, upload, import, email, purge, refund, merge, archive, or delete flows
 against an active account. Prefer mocked API tests for command behavior.
 

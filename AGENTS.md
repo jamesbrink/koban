@@ -11,6 +11,8 @@ Koban is an early Rust CLI for Invoice Ninja. Keep the current implemented API
 surface read-only unless explicitly requested for write support:
 
 - Use only `GET` requests in CLI commands.
+- Invoice download commands may write PDF bytes to explicit local file paths,
+  but they must still use read-only `GET` endpoints.
 - Do not smoke test destructive, write, bulk, upload, import, email, purge,
   refund, merge, archive, or delete endpoints against an active account.
 - Keep token handling environment-first with `INVOICE_NINJA_API_TOKEN` and

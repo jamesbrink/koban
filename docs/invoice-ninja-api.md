@@ -1,7 +1,7 @@
 # Invoice Ninja API Reference For Koban
 
 This document is Koban's working API reference. It is intentionally conservative
-because the first development target is James' active Invoice Ninja account. Until
+because early development may run against an active Invoice Ninja account. Until
 we have explicit write safeguards, Koban should only perform read-only requests
 against production data.
 
@@ -18,6 +18,12 @@ Last researched: 2026-05-28.
 - List invoices: https://invoiceninja.github.io/docs/api-reference/get-invoices
 - Payments API: https://invoiceninja.github.io/docs/api-reference/payments
 - List payments: https://invoiceninja.github.io/docs/api-reference/get-payments
+- Quotes API: https://invoiceninja.github.io/docs/api-reference/quotes
+- Credits API: https://invoiceninja.github.io/docs/api-reference/credits
+- Vendors API: https://invoiceninja.github.io/docs/api-reference/vendors
+- Expenses API: https://invoiceninja.github.io/docs/api-reference/expenses
+- Projects API: https://invoiceninja.github.io/docs/api-reference/projects
+- Tasks API: https://invoiceninja.github.io/docs/api-reference/tasks
 - Search API: https://invoiceninja.github.io/docs/api-reference/search
 - Search endpoint: https://invoiceninja.github.io/docs/api-reference/post-search
 - Statics endpoint: https://invoiceninja.github.io/docs/api-reference/get-statics
@@ -108,11 +114,14 @@ Client list examples show:
 Implemented design:
 
 - List commands expose explicit `--page` and `--per-page` flags.
+- List commands expose repeatable raw `--filter key=value` flags and a raw
+  `--sort field|direction` flag.
+- List commands expose `--all` and `--limit` for controlled pagination.
 - List/show/template/edit-template commands expose repeatable, comma-separated
   `--include` flags.
-- Keep future raw filter support available for advanced users, but do not invent a
-  broad filter DSL in the first pass.
-- Avoid automatic all-page traversal until rate-limit behavior is tested.
+- Single-page JSON output preserves the API response. Multi-page JSON output uses
+  a local `data` plus `meta.pages_fetched` envelope.
+- Avoid unbounded traversal unless the user explicitly passes `--all`.
 
 ## High-Value Read-Only Endpoints
 
@@ -135,6 +144,36 @@ GET /api/v1/payments
 GET /api/v1/payments/{id}
 GET /api/v1/payments/{id}/edit
 GET /api/v1/payments/create
+
+GET /api/v1/quotes
+GET /api/v1/quotes/{id}
+GET /api/v1/quotes/{id}/edit
+GET /api/v1/quotes/create
+
+GET /api/v1/credits
+GET /api/v1/credits/{id}
+GET /api/v1/credits/{id}/edit
+GET /api/v1/credits/create
+
+GET /api/v1/vendors
+GET /api/v1/vendors/{id}
+GET /api/v1/vendors/{id}/edit
+GET /api/v1/vendors/create
+
+GET /api/v1/expenses
+GET /api/v1/expenses/{id}
+GET /api/v1/expenses/{id}/edit
+GET /api/v1/expenses/create
+
+GET /api/v1/projects
+GET /api/v1/projects/{id}
+GET /api/v1/projects/{id}/edit
+GET /api/v1/projects/create
+
+GET /api/v1/tasks
+GET /api/v1/tasks/{id}
+GET /api/v1/tasks/{id}/edit
+GET /api/v1/tasks/create
 
 GET /api/v1/statics
 ```
@@ -206,24 +245,23 @@ values in JSON output.
 
 ## Implemented Starting Point
 
-Milestone 1 is now a read-only API foundation:
+The current implementation is a read-only API foundation:
 
 1. A small HTTP client module with `base_url`, `api_token`, and default headers.
 2. Config loading from environment only:
    `INVOICE_NINJA_API_TOKEN` and optional `INVOICE_NINJA_BASE_URL`.
 3. `koban statics` uses `GET /api/v1/statics` as the least
    business-data-heavy authenticated smoke test.
-4. `koban clients list --page --per-page --output json|table`.
-5. `koban clients show <id> --output json|table`.
-6. The same list/show pattern for invoices.
-7. The same list/show pattern for payments.
-8. Read-only `template` commands for `GET /api/v1/{resource}/create`.
-9. Read-only `edit-template` commands for `GET /api/v1/{resource}/{id}/edit`.
+4. Resource `list/show/template/edit-template` commands for clients, invoices,
+   payments, quotes, credits, vendors, expenses, projects, and tasks.
+5. List pagination with `--page`, `--per-page`, `--all`, and `--limit`.
+6. Raw filtering and sorting with `--filter key=value` and `--sort field|dir`.
+7. Read-only invoice PDF downloads for invoice PDFs and delivery notes.
 
 Safety rules for this milestone:
 
 - Only issue `GET` requests.
-- No automatic pagination across multiple pages by default.
+- No automatic pagination across multiple pages unless `--all` is explicit.
 - No file uploads, no imports, no email endpoints, no bulk endpoints.
 - No command may mutate production data.
 - JSON output should be stable enough for AI agents.
@@ -235,22 +273,32 @@ Implemented command shape:
 ```text
 koban statics --output json
 koban clients list --page 1 --per-page 20 --output table
+koban clients list --filter balance=gt:1000 --filter name=Bob --sort 'name|desc'
 koban clients show <client_id> --output json
 koban clients template --output json
 koban clients edit-template <client_id> --output json
 koban invoices list --page 1 --per-page 20 --output table
+koban invoices list --all --limit 100 --output json
 koban invoices show <invoice_id> --output json
 koban invoices template --output json
 koban invoices edit-template <invoice_id> --output json
+koban invoices download <invitation_key> --output-file invoice.pdf
+koban invoices delivery-note <invoice_id> --output-file delivery-note.pdf
 koban payments list --page 1 --per-page 20 --output table
 koban payments show <payment_id> --output json
 koban payments template --output json
 koban payments edit-template <payment_id> --output json
+koban quotes list --output table
+koban credits show <credit_id> --output json
+koban vendors template --output json
+koban expenses edit-template <expense_id> --output json
+koban projects list --filter client_id=<client_id>
+koban tasks list --all --limit 50
 ```
 
 ## Open Questions
 
-- Which hosted base URL does James' active account use: `https://invoicing.co`,
+- Which hosted base URL does the active account use: `https://invoicing.co`,
   `https://app.invoicing.co`, or a self-hosted domain? The API docs identify
   `https://invoicing.co` as the v5 production API endpoint.
 - Should Koban prefer Invoice Ninja's response shape verbatim for agent JSON, or
@@ -258,5 +306,5 @@ koban payments edit-template <payment_id> --output json
   envelope?
 - Should statics be cached on disk, and if so where should Koban keep cache files
   on macOS/Linux?
-- What are the first truly useful human workflows: finding a client, checking
-  unpaid invoices, downloading PDFs, or creating draft invoices?
+- What are the first truly useful write workflows once read-only coverage is
+  stable: creating draft invoices, updating clients, or recording payments?

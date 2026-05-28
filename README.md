@@ -7,7 +7,7 @@ shell completions.
 
 The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
 still early work: the CLI boots, reports its version, generates shell
-completions, and exposes a small read-only Invoice Ninja API surface.
+completions, and exposes a growing read-only Invoice Ninja API surface.
 
 ## Install
 
@@ -48,7 +48,7 @@ koban completions fish
 koban completions nushell
 ```
 
-The first API commands are read-only and use `GET` requests only:
+The implemented API commands are read-only and use `GET` requests only:
 
 ```sh
 koban statics --output json
@@ -57,13 +57,22 @@ koban clients show <id> --output json
 koban clients template --output json
 koban clients edit-template <id> --output json
 koban invoices list
+koban invoices list --filter status_id=gt:1 --sort 'date|desc' --all --limit 50
 koban invoices show <id>
 koban invoices template --output json
 koban invoices edit-template <id> --output json
+koban invoices download <invitation_key> --output-file invoice.pdf
+koban invoices delivery-note <id> --output-file delivery-note.pdf
 koban payments list
 koban payments show <id>
 koban payments template --output json
 koban payments edit-template <id> --output json
+koban quotes list
+koban credits list
+koban vendors list
+koban expenses list
+koban projects list
+koban tasks list
 ```
 
 ## Invoice Ninja Direction
@@ -92,11 +101,28 @@ koban payments list
 koban payments show <id>
 koban payments template
 koban payments edit-template <id>
+koban quotes list
+koban quotes show <id>
+koban credits list
+koban vendors list
+koban expenses list
+koban projects list
+koban tasks list
 ```
 
 The `template` and `edit-template` commands use Invoice Ninja's read-only
 `GET /create` and `GET /{id}/edit` routes. They return default/editable payloads
 for schema discovery; they do not create or update records.
+
+List commands accept raw Invoice Ninja query filters and sorting:
+
+```sh
+koban clients list --filter balance=gt:1000 --filter name=Bob --sort 'name|desc'
+koban invoices list --all --limit 100 --output json
+```
+
+Invoice download commands also use read-only `GET` routes and write PDF bytes to
+explicit file paths. Existing files are not overwritten unless `--force` is set.
 
 Future creation and update commands should grow around explicit files or
 stdin-first JSON so agent workflows do not depend on prompts.

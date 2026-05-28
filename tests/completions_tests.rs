@@ -78,6 +78,12 @@ fn dynamic_root_completions_include_resources() {
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
         .stdout(predicate::str::contains("payments"))
+        .stdout(predicate::str::contains("quotes"))
+        .stdout(predicate::str::contains("credits"))
+        .stdout(predicate::str::contains("vendors"))
+        .stdout(predicate::str::contains("expenses"))
+        .stdout(predicate::str::contains("projects"))
+        .stdout(predicate::str::contains("tasks"))
         .stdout(predicate::str::contains("update"))
         .stdout(predicate::str::contains("completions"));
 }
@@ -94,4 +100,16 @@ fn dynamic_resource_completions_include_list_and_show() {
         .stdout(predicate::str::contains("show"))
         .stdout(predicate::str::contains("\ntemplate\n"))
         .stdout(predicate::str::contains("edit-template"));
+}
+
+#[test]
+fn dynamic_invoice_completions_include_download_commands() {
+    koban()
+        .env("COMPLETE", "bash")
+        .env("_CLAP_COMPLETE_INDEX", "2")
+        .args(["--", "koban", "invoices", ""])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("download"))
+        .stdout(predicate::str::contains("delivery-note"));
 }
