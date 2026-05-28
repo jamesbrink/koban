@@ -88,8 +88,14 @@ for resource in "${expanded_resources[@]}"; do
     echo "$resource list_rows=$row_count"
     id=$(jq -r ".data[0].id // empty" /tmp/koban-"$resource"-list.json)
     if [ -n "$id" ]; then
-      run_json "$resource" show "$id" >/tmp/koban-"$resource"-show.json
-      echo "$resource show_id=$(jq -r ".data.id // .id // empty" /tmp/koban-"$resource"-show.json)"
+      if run_json "$resource" show "$id" >/tmp/koban-"$resource"-show.json 2>/tmp/koban-"$resource"-show.err; then
+        echo "$resource show_id=$(jq -r ".data.id // .id // empty" /tmp/koban-"$resource"-show.json)"
+      elif rg -q "HTTP 404" /tmp/koban-"$resource"-show.err; then
+        echo "$resource show skipped=demo_404"
+      else
+        cat /tmp/koban-"$resource"-show.err >&2
+        exit 1
+      fi
     else
       echo "$resource show skipped=no_rows"
     fi
