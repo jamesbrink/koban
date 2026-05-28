@@ -3,7 +3,7 @@
 //! The public surface is intentionally small while the CLI and Invoice Ninja
 //! client model settle.
 
-use std::{env, ffi::OsString, fmt};
+use std::{env, fmt};
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use miette::Diagnostic;
@@ -44,16 +44,6 @@ pub struct Cli {
 
     #[command(subcommand)]
     pub command: Option<Commands>,
-}
-
-impl Cli {
-    pub fn parse_from_args<I, T>(args: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<OsString> + Clone,
-    {
-        Self::parse_from(args)
-    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
@@ -195,14 +185,6 @@ impl Resource {
             Self::Payments => "payments",
         }
     }
-
-    fn title(self) -> &'static str {
-        match self {
-            Self::Clients => "clients",
-            Self::Invoices => "invoices",
-            Self::Payments => "payments",
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -224,7 +206,7 @@ impl Config {
             return Err(KobanError::MissingToken);
         }
 
-        let base_url =
+        let mut base_url =
             Url::parse(base_url.as_ref()).map_err(|source| KobanError::InvalidBaseUrl {
                 value: base_url.as_ref().to_string(),
                 source,
@@ -235,6 +217,12 @@ impl Config {
             return Err(KobanError::InsecureBaseUrl {
                 value: base_url.to_string(),
             });
+        }
+
+        if !base_url.path().ends_with('/') {
+            let mut path = base_url.path().to_string();
+            path.push('/');
+            base_url.set_path(&path);
         }
 
         Ok(Self {
@@ -446,16 +434,17 @@ fn render_table(resource: Option<Resource>, value: &Value) -> String {
 
     let rows = response_rows(value)
         .into_iter()
-        .map(|item| match resource {
-            Some(Resource::Clients) => Row::client(item),
-            Some(Resource::Invoices) => Row::invoice(item),
-            Some(Resource::Payments) => Row::payment(item),
-            None => Row::statics(item),
-        })
+        .map(
+            |item| match resource.expect("statics are rendered before resource row dispatch") {
+                Resource::Clients => Row::client(item),
+                Resource::Invoices => Row::invoice(item),
+                Resource::Payments => Row::payment(item),
+            },
+        )
         .collect::<Vec<_>>();
 
     if rows.is_empty() {
-        return format!("No {} found.", resource.map_or("records", Resource::title));
+        return format!("No {} found.", resource.map_or("records", Resource::path));
     }
 
     let mut table = Table::new(rows);
@@ -546,7 +535,7 @@ impl Row {
             ),
             status: field(value, &["status"]),
             amount: dash(),
-            balance: moneyish(value, &["balance"]),
+            balance: field(value, &["balance"]),
             date: field(value, &["created_at"]),
         }
     }
@@ -564,8 +553,8 @@ impl Row {
                 ],
             ),
             status: invoice_status(value),
-            amount: moneyish(value, &["amount"]),
-            balance: moneyish(value, &["balance"]),
+            amount: field(value, &["amount"]),
+            balance: field(value, &["balance"]),
             date: first_field(value, &[&["due_date"], &["date"], &["created_at"]]),
         }
     }
@@ -583,21 +572,9 @@ impl Row {
                 ],
             ),
             status: field(value, &["status"]),
-            amount: moneyish(value, &["amount"]),
+            amount: field(value, &["amount"]),
             balance: dash(),
             date: first_field(value, &[&["date"], &["created_at"]]),
-        }
-    }
-
-    fn statics(value: &Value) -> Self {
-        Self {
-            id: field(value, &["id"]),
-            number: dash(),
-            name: first_field(value, &[&["name"], &["value"], &["label"]]),
-            status: dash(),
-            amount: dash(),
-            balance: dash(),
-            date: dash(),
         }
     }
 }
@@ -614,14 +591,6 @@ fn invoice_status(value: &Value) -> String {
         Some(-2) => "unpaid".to_string(),
         _ => first_field(value, &[&["status"], &["status_id"]]),
     }
-}
-
-fn moneyish(value: &Value, path: &[&str]) -> String {
-    let raw = field(value, path);
-    if raw == "-" {
-        return raw;
-    }
-    raw
 }
 
 fn first_field(value: &Value, paths: &[&[&str]]) -> String {
@@ -725,6 +694,7 @@ pub fn command() -> clap::Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use httpmock::{Method::GET, MockServer};
 
     #[test]
     fn config_defaults_to_invoice_ninja_base_url() {
@@ -733,9 +703,49 @@ mod tests {
     }
 
     #[test]
+    fn completion_shell_display_uses_documented_names() {
+        assert_eq!(CompletionShell::Bash.to_string(), "bash");
+        assert_eq!(CompletionShell::Elvish.to_string(), "elvish");
+        assert_eq!(CompletionShell::Fish.to_string(), "fish");
+        assert_eq!(CompletionShell::Nushell.to_string(), "nushell");
+        assert_eq!(CompletionShell::PowerShell.to_string(), "powershell");
+        assert_eq!(CompletionShell::Zsh.to_string(), "zsh");
+    }
+
+    #[test]
+    fn config_preserves_self_hosted_path_prefix_without_trailing_slash() {
+        let config =
+            Config::from_values("https://example.com/invoiceninja", "token").expect("config");
+        let client = ApiClient::new(config);
+        let url = client.endpoint("api/v1/clients", &[]).expect("url");
+        assert_eq!(
+            url.as_str(),
+            "https://example.com/invoiceninja/api/v1/clients"
+        );
+    }
+
+    #[test]
+    fn config_preserves_self_hosted_path_prefix_with_trailing_slash() {
+        let config =
+            Config::from_values("https://example.com/invoiceninja/", "token").expect("config");
+        let client = ApiClient::new(config);
+        let url = client.endpoint("api/v1/clients", &[]).expect("url");
+        assert_eq!(
+            url.as_str(),
+            "https://example.com/invoiceninja/api/v1/clients"
+        );
+    }
+
+    #[test]
     fn config_rejects_empty_token() {
         let error = Config::from_values(DEFAULT_BASE_URL, "").expect_err("missing token");
         assert!(matches!(error, KobanError::MissingToken));
+    }
+
+    #[test]
+    fn config_reports_invalid_base_url() {
+        let error = Config::from_values("not a url", "token").expect_err("invalid URL");
+        assert!(matches!(error, KobanError::InvalidBaseUrl { .. }));
     }
 
     #[test]
@@ -765,11 +775,24 @@ mod tests {
     }
 
     #[test]
+    fn endpoint_accepts_leading_slash_paths() {
+        let client =
+            ApiClient::new(Config::from_values("http://localhost:1234", "token").expect("config"));
+        let url = client.endpoint("/api/v1/statics", &[]).expect("url");
+        assert_eq!(url.as_str(), "http://localhost:1234/api/v1/statics");
+    }
+
+    #[test]
     fn redacts_token_from_text() {
         assert_eq!(
             redact("bad token secret-token failed", "secret-token"),
             "bad token [REDACTED] failed"
         );
+    }
+
+    #[test]
+    fn redaction_is_noop_without_token() {
+        assert_eq!(redact("nothing to hide", ""), "nothing to hide");
     }
 
     #[test]
@@ -791,15 +814,147 @@ mod tests {
     }
 
     #[test]
+    fn table_output_reports_empty_resource_lists() {
+        let value = serde_json::json!({"data": []});
+        let output =
+            render_value(OutputFormat::Table, Some(Resource::Clients), &value).expect("table");
+        assert_eq!(output, "No clients found.");
+    }
+
+    #[test]
     fn table_output_renders_statics_summary() {
         let value = serde_json::json!({
+            "bulk_updates": {"archive": "Archive", "delete": "Delete"},
             "countries": [{"id": "840", "name": "United States"}],
-            "currencies": [{"id": "1", "name": "US Dollar"}]
+            "currencies": [{"id": "1", "name": "US Dollar"}],
+            "default_size": "A4",
+            "invoice_number": 1,
+            "enabled": true,
+            "nothing": null
         });
         let output = render_value(OutputFormat::Table, None, &value).expect("table");
+        assert!(output.contains("bulk_updates"), "got: {output}");
         assert!(output.contains("countries"), "got: {output}");
         assert!(output.contains("currencies"), "got: {output}");
         assert!(output.contains("array"), "got: {output}");
+        assert!(output.contains("object"), "got: {output}");
+    }
+
+    #[test]
+    fn table_output_reports_empty_or_invalid_statics() {
+        let empty = render_value(OutputFormat::Table, None, &serde_json::json!({})).expect("table");
+        assert_eq!(empty, "No statics found.");
+
+        let scalar =
+            render_value(OutputFormat::Table, None, &serde_json::json!(true)).expect("table");
+        assert_eq!(scalar, "No statics found.");
+    }
+
+    #[test]
+    fn table_output_renders_invoices_and_payments() {
+        let invoice = serde_json::json!({
+            "data": [{
+                "id": "invoice_1",
+                "number": "INV-1",
+                "client": {"display_name": "Grace Hopper"},
+                "status_id": 4,
+                "amount": 100,
+                "balance": 0,
+                "due_date": "2026-06-01"
+            }]
+        });
+        let invoice_output =
+            render_value(OutputFormat::Table, Some(Resource::Invoices), &invoice).expect("table");
+        assert!(
+            invoice_output.contains("Grace Hopper"),
+            "got: {invoice_output}"
+        );
+        assert!(invoice_output.contains("paid"), "got: {invoice_output}");
+
+        let payment = serde_json::json!({
+            "data": [{
+                "id": "payment_1",
+                "number": "PAY-1",
+                "client_id": "client_1",
+                "status": "completed",
+                "amount": 50,
+                "date": "2026-06-02"
+            }]
+        });
+        let payment_output =
+            render_value(OutputFormat::Table, Some(Resource::Payments), &payment).expect("table");
+        assert!(payment_output.contains("PAY-1"), "got: {payment_output}");
+        assert!(
+            payment_output.contains("completed"),
+            "got: {payment_output}"
+        );
+    }
+
+    #[test]
+    fn invoice_status_maps_all_known_statuses_and_fallbacks() {
+        let cases = [
+            (1, "draft"),
+            (2, "sent"),
+            (3, "partially paid"),
+            (4, "paid"),
+            (5, "cancelled"),
+            (6, "reversed"),
+            (-1, "overdue"),
+            (-2, "unpaid"),
+        ];
+
+        for (status, expected) in cases {
+            assert_eq!(
+                invoice_status(&serde_json::json!({"status_id": status})),
+                expected
+            );
+        }
+
+        assert_eq!(
+            invoice_status(&serde_json::json!({"status": "custom"})),
+            "custom"
+        );
+    }
+
+    #[test]
+    fn field_handles_nested_arrays_and_value_kinds() {
+        let value = serde_json::json!({
+            "contacts": [{"email": "ada@example.test"}],
+            "empty": "",
+            "nullish": null,
+            "flag": true,
+            "items": [1, 2],
+            "object": {"a": 1}
+        });
+
+        assert_eq!(
+            field(&value, &["contacts", "0", "email"]),
+            "ada@example.test"
+        );
+        assert_eq!(field(&value, &["contacts", "1", "email"]), "-");
+        assert_eq!(field(&value, &["empty"]), "-");
+        assert_eq!(field(&value, &["nullish"]), "-");
+        assert_eq!(field(&value, &["flag"]), "true");
+        assert_eq!(field(&value, &["items"]), "2 items");
+        assert_eq!(field(&value, &["object"]), "1 fields");
+        assert_eq!(field(&value, &["missing"]), "-");
+
+        assert_eq!(value_kind(&serde_json::json!("x")), "string");
+        assert_eq!(value_kind(&serde_json::json!(1)), "number");
+        assert_eq!(value_kind(&serde_json::json!(false)), "boolean");
+        assert_eq!(value_kind(&Value::Null), "null");
+        assert_eq!(value_len(&serde_json::json!("x")), 1);
+    }
+
+    #[test]
+    fn response_rows_accepts_common_api_shapes() {
+        assert_eq!(
+            response_rows(&serde_json::json!({"data": {"id": "one"}})).len(),
+            1
+        );
+        assert_eq!(response_rows(&serde_json::json!([{"id": "one"}])).len(), 1);
+        assert_eq!(response_rows(&serde_json::json!({"id": "one"})).len(), 1);
+        assert_eq!(response_rows(&serde_json::json!(null)).len(), 0);
     }
 
     #[test]
@@ -813,5 +968,178 @@ mod tests {
         let message = error.to_string();
         assert!(message.contains("[REDACTED]"), "got: {message}");
         assert!(!message.contains("secret-token"), "got: {message}");
+    }
+
+    #[test]
+    fn api_errors_extract_arrays_objects_and_plain_text() {
+        let array_error = api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "/api/v1/clients".to_string(),
+            r#"{"errors":["name is required",{"email":"invalid"}]}"#.to_string(),
+            "token",
+        );
+        assert!(array_error.to_string().contains("name is required"));
+
+        let object_error = api_error(
+            StatusCode::BAD_REQUEST,
+            "/api/v1/clients".to_string(),
+            r#"{"error":{"message":"bad"}}"#.to_string(),
+            "token",
+        );
+        assert!(object_error.to_string().contains("message"));
+
+        let text_error = api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "/api/v1/clients".to_string(),
+            "plain failure".to_string(),
+            "token",
+        );
+        assert!(text_error.to_string().contains("plain failure"));
+
+        let numeric_message = api_error(
+            StatusCode::BAD_REQUEST,
+            "/api/v1/clients".to_string(),
+            r#"{"message":123}"#.to_string(),
+            "token",
+        );
+        assert!(numeric_message.to_string().contains("\"message\":123"));
+    }
+
+    #[tokio::test]
+    async fn get_json_reports_transport_errors() {
+        let client = ApiClient::new(
+            Config::from_values("http://127.0.0.1:9", "secret-token").expect("config"),
+        );
+        let error = client
+            .get_json("api/v1/statics", &[])
+            .await
+            .expect_err("transport failure");
+        let message = error.to_string();
+        assert!(matches!(error, KobanError::Transport { .. }));
+        assert!(!message.contains("secret-token"), "got: {message}");
+    }
+
+    #[tokio::test]
+    async fn execute_handles_non_network_commands_without_configured_endpoint() {
+        let config = Config::from_values("http://localhost:1234", "token").expect("config");
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Table,
+                command: Some(Commands::Completions {
+                    shell: CompletionShell::Bash,
+                }),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("execute completions");
+        assert!(output.is_empty());
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Table,
+                command: None,
+            },
+            config,
+        )
+        .await
+        .expect("execute none");
+        assert!(output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_resource_commands_against_mock_api() {
+        let server = MockServer::start();
+        let config = Config::from_values(server.base_url(), "token").expect("config");
+
+        let clients = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/clients")
+                .query_param("page", "1")
+                .query_param("per_page", "20");
+            then.status(200).json_body(serde_json::json!({
+                "data": [{"id": "client_1", "display_name": "Ada"}]
+            }));
+        });
+        let invoices = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/invoices/invoice_1");
+            then.status(200).json_body(serde_json::json!({
+                "data": {"id": "invoice_1", "number": "INV-1", "status_id": 2}
+            }));
+        });
+        let payments = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/payments")
+                .query_param("include", "client");
+            then.status(200).json_body(serde_json::json!({
+                "data": [{"id": "payment_1", "number": "PAY-1"}]
+            }));
+        });
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Table,
+                command: Some(Commands::Clients(ResourceCommand::List(ListArgs {
+                    page: 1,
+                    per_page: 20,
+                    include: Vec::new(),
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("clients list");
+        assert!(output.contains("Ada"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Table,
+                command: Some(Commands::Invoices(ResourceCommand::Show(ShowArgs {
+                    id: "invoice_1".to_string(),
+                    include: Vec::new(),
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("invoice show");
+        assert!(output.contains("sent"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Payments(ResourceCommand::List(ListArgs {
+                    page: 1,
+                    per_page: 20,
+                    include: vec!["client".to_string(), " ".to_string()],
+                }))),
+            },
+            config,
+        )
+        .await
+        .expect("payments list");
+        assert!(output.contains("payment_1"), "got: {output}");
+
+        clients.assert();
+        invoices.assert();
+        payments.assert();
+    }
+
+    #[tokio::test]
+    async fn get_json_reports_decode_errors() {
+        let server = MockServer::start();
+        let invalid_json = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/statics");
+            then.status(200).body("not json");
+        });
+
+        let client =
+            ApiClient::new(Config::from_values(server.base_url(), "token").expect("config"));
+        let error = client
+            .get_json("api/v1/statics", &[])
+            .await
+            .expect_err("decode failure");
+        assert!(matches!(error, KobanError::Decode { .. }));
+        invalid_json.assert();
     }
 }
