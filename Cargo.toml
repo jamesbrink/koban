@@ -1,19 +1,17 @@
-[package]
-name = "koban"
-version = "0.0.1"
+[workspace]
+resolver = "3"
+members = ["crates/koban", "crates/koban-cli"]
+
+[workspace.package]
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
 authors = ["James Brink <brink.james@gmail.com>"]
-description = "A Rust CLI for Invoice Ninja, built for humans and AI agents"
 homepage = "https://github.com/jamesbrink/koban"
-documentation = "https://docs.rs/koban"
 repository = "https://github.com/jamesbrink/koban"
-readme = "README.md"
-keywords = ["invoice-ninja", "invoice", "cli", "agents", "api"]
-categories = ["command-line-utilities"]
 
-[dependencies]
+[workspace.dependencies]
+# Library + CLI shared runtime dependencies (single source of version truth).
 clap = { version = "4.6.1", features = ["derive", "wrap_help"] }
 clap_complete = { version = "4.6.0", features = ["unstable-dynamic"] }
 clap_complete_nushell = "4.6.0"
@@ -29,8 +27,11 @@ thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
 url = "2.5.8"
 
-[dev-dependencies]
+# Dev/test shared dependencies.
 assert_cmd = "2.2.2"
 httpmock = "0.8.3"
 predicates = "3.1.4"
 tempfile = "3.23.0"
+
+# The koban library is consumed by koban-cli through the workspace.
+koban = { version = "0.1.0", path = "crates/koban" }

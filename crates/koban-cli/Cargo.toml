@@ -1,0 +1,40 @@
+[package]
+name = "koban-cli"
+version = "0.1.0"
+description = "A Rust CLI for Invoice Ninja, built for humans and AI agents"
+documentation = "https://docs.rs/koban-cli"
+keywords = ["invoice-ninja", "invoice", "cli", "agents", "api"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+# The package is `koban-cli` (so it can be published alongside the `koban`
+# library), but the installed executable stays `koban`.
+[[bin]]
+name = "koban"
+path = "src/main.rs"
+
+[dependencies]
+koban = { workspace = true, features = ["miette"] }
+clap.workspace = true
+clap_complete.workspace = true
+clap_complete_nushell.workspace = true
+flate2.workspace = true
+miette.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tabled.workspace = true
+tar.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+httpmock.workspace = true
+predicates.workspace = true
+tempfile.workspace = true

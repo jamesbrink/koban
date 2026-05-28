@@ -1,7 +1,9 @@
 use serde_json::Value;
 use tabled::{Table, Tabled, settings::Style};
 
-use crate::{KobanError, OutputFormat, Resource, Result};
+use koban::{KobanError, Resource, Result};
+
+use crate::cli::OutputFormat;
 
 pub fn render_value(
     output: OutputFormat,

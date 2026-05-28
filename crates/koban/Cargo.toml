@@ -1,0 +1,35 @@
+[package]
+name = "koban"
+version = "0.1.0"
+description = "A Rust client library for the Invoice Ninja API, built for humans and AI agents"
+documentation = "https://docs.rs/koban"
+keywords = ["invoice-ninja", "invoice", "api", "client", "agents"]
+categories = ["api-bindings"]
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[features]
+# `miette` enriches KobanError with diagnostic help text. Off by default so the
+# library stays lightweight; the koban-cli binary opts in.
+miette = ["dep:miette"]
+
+[dependencies]
+miette = { workspace = true, optional = true }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+httpmock.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true

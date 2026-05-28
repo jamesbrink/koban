@@ -1,29 +1,32 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, path::PathBuf};
 
 const MAX_SOURCE_LINES: usize = 900;
 const MAX_TEST_LINES: usize = 1_100;
+
+/// Workspace root, derived from this crate's manifest dir
+/// (`<root>/crates/koban-cli`).
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root above crates/koban-cli")
+        .to_path_buf()
+}
 
 #[test]
 fn rust_source_files_stay_small_enough_to_review() {
     let mut failures = Vec::new();
 
-    collect_rust_file_failures(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
-        &mut failures,
-    );
-    collect_rust_file_failures(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests"),
-        &mut failures,
-    );
+    // Scan every workspace member's source and tests.
+    collect_rust_file_failures(&workspace_root().join("crates"), &mut failures);
 
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
 fn ci_keeps_coverage_gate_enforced() {
-    let ci =
-        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/ci.yml"))
-            .expect("read CI workflow");
+    let ci = fs::read_to_string(workspace_root().join(".github/workflows/ci.yml"))
+        .expect("read CI workflow");
 
     assert!(
         !ci.contains("continue-on-error: true"),
@@ -37,10 +40,9 @@ fn ci_keeps_coverage_gate_enforced() {
 
 #[test]
 fn release_publish_crate_is_gated_on_registry_token() {
-    let workflow = fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release-please.yml"),
-    )
-    .expect("read release workflow");
+    let workflow =
+        fs::read_to_string(workspace_root().join(".github/workflows/release-please.yml"))
+            .expect("read release workflow");
 
     assert!(
         !workflow.contains("secrets.CARGO_REGISTRY_TOKEN != ''"),
@@ -64,10 +66,9 @@ fn collect_rust_file_failures(dir: &Path, failures: &mut Vec<String>) {
             continue;
         }
 
-        let max_lines = if path.starts_with(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests"))
-            || path
-                .components()
-                .any(|component| component.as_os_str() == "tests")
+        let max_lines = if path
+            .components()
+            .any(|component| component.as_os_str() == "tests")
         {
             MAX_TEST_LINES
         } else {
@@ -78,7 +79,7 @@ fn collect_rust_file_failures(dir: &Path, failures: &mut Vec<String>) {
         if line_count > max_lines {
             failures.push(format!(
                 "{} has {line_count} lines, above the {max_lines} line budget",
-                path.strip_prefix(env!("CARGO_MANIFEST_DIR"))
+                path.strip_prefix(workspace_root())
                     .unwrap_or(&path)
                     .display()
             ));

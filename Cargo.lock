@@ -931,7 +931,22 @@ dependencies = [
 
 [[package]]
 name = "koban"
-version = "0.0.1"
+version = "0.1.0"
+dependencies = [
+ "httpmock",
+ "miette",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "koban-cli"
+version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -939,16 +954,14 @@ dependencies = [
  "clap_complete_nushell",
  "flate2",
  "httpmock",
+ "koban",
  "miette",
  "predicates",
- "reqwest",
- "serde",
  "serde_json",
  "sha2",
  "tabled",
  "tar",
  "tempfile",
- "thiserror",
  "tokio",
  "url",
 ]

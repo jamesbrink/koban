@@ -2,13 +2,13 @@ use std::{fs, path::Path};
 
 use serde_json::{Value, json};
 
+use koban::{ApiClient, Config, KobanError, Resource, Result};
+
 use crate::{
-    Cli, Commands, Config, KobanError, OutputFormat, Result,
-    api::ApiClient,
     cli::{
-        BulkArgs, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod,
+        BulkArgs, Cli, Commands, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod,
         InspectResourceCommand, InvoiceActionArgs, InvoiceCommand, InvoiceWriteArgs, ListArgs,
-        ResourceActionArgs, ResourceCommand, ResourceWriteArgs, UpdateInvoiceArgs,
+        OutputFormat, ResourceActionArgs, ResourceCommand, ResourceWriteArgs, UpdateInvoiceArgs,
         UpdateResourceArgs, UploadArgs,
     },
     invoice::{
@@ -17,7 +17,6 @@ use crate::{
     },
     payload::{merge_resource_action_payload, resource_payload},
     render::{render_value, response_rows},
-    resource::Resource,
     update,
 };
 

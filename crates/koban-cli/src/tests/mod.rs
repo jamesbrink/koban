@@ -4,25 +4,18 @@ use httpmock::{
     Method::{GET, POST, PUT},
     MockServer,
 };
-use reqwest::StatusCode;
 use serde_json::Value;
 
-use crate::{
-    api::{ApiClient, api_error},
-    cli::*,
-    commands::*,
-    invoice::*,
-    payload::*,
-    render::*,
-    *,
-};
+use koban::*;
 
-mod api;
+use crate::{cli::*, commands::*, invoice::*, payload::*, render::*};
+
+mod cli;
 mod commands;
-mod config;
 mod invoice;
 mod payload;
 mod render;
+
 fn empty_payload_args() -> InvoicePayloadArgs {
     InvoicePayloadArgs {
         data: None,
