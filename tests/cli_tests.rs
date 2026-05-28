@@ -39,7 +39,7 @@ fn resource_help_includes_read_only_template_commands() {
         .args(["invoices", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("template"))
+        .stdout(predicate::str::contains("\n  template\n"))
         .stdout(predicate::str::contains("edit-template"));
 }
 

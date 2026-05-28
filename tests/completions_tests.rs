@@ -91,6 +91,6 @@ fn dynamic_resource_completions_include_list_and_show() {
         .success()
         .stdout(predicate::str::contains("list"))
         .stdout(predicate::str::contains("show"))
-        .stdout(predicate::str::contains("template"))
+        .stdout(predicate::str::contains("\ntemplate\n"))
         .stdout(predicate::str::contains("edit-template"));
 }
