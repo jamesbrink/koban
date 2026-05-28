@@ -59,6 +59,17 @@ fn table_output_reports_empty_or_invalid_statics() {
 }
 
 #[test]
+fn table_output_renders_endpoint_rows_without_resource_context() {
+    let value = serde_json::json!({
+        "data": [{"id": "row_1", "name": "Revenue", "amount": 42}]
+    });
+    let output = render_value(OutputFormat::Table, None, &value).expect("table");
+    assert!(output.contains("row_1"), "got: {output}");
+    assert!(output.contains("Revenue"), "got: {output}");
+    assert!(!output.contains("entries"), "got: {output}");
+}
+
+#[test]
 fn table_output_renders_invoices_and_payments() {
     let invoice = serde_json::json!({
         "data": [{

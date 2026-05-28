@@ -68,7 +68,7 @@ koban invoices edit-template <id> --output json
 koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
 koban invoices create --data-file invoice.json --include client
 koban invoices update <id> --data-file invoice.json --dry-run
-koban invoices update <id> --public-notes "Thanks again" --mark-sent
+koban invoices update <id> --public-notes "Thanks again" --mark-sent --yes
 koban invoices delete <id> --dry-run
 koban invoices delete <id> --yes
 koban invoices bulk --action archive --id <id> --id <id> --dry-run

@@ -20,30 +20,35 @@ pub fn render_value(
 
 pub(crate) fn render_table(resource: Option<Resource>, value: &Value) -> String {
     if resource.is_none() {
+        if value.get("data").is_some() {
+            return render_rows(None, value);
+        }
         return render_statics_table(value);
     }
 
+    render_rows(resource, value)
+}
+
+fn render_rows(resource: Option<Resource>, value: &Value) -> String {
     let rows = response_rows(value)
         .into_iter()
-        .map(
-            |item| match resource.expect("statics are rendered before resource row dispatch") {
-                Resource::Clients => Row::client(item),
-                Resource::Invoices => Row::invoice(item),
-                Resource::Payments => Row::payment(item),
-                Resource::Quotes => Row::quote(item),
-                Resource::Credits => Row::credit(item),
-                Resource::Vendors => Row::vendor(item),
-                Resource::Expenses => Row::expense(item),
-                Resource::Projects => Row::project(item),
-                Resource::Tasks => Row::task(item),
-                Resource::Products => Row::product(item),
-                Resource::PurchaseOrders => Row::purchase_order(item),
-                Resource::RecurringInvoices => Row::invoice_like(item),
-                Resource::RecurringExpenses => Row::expense(item),
-                Resource::BankTransactions => Row::bank_transaction(item),
-                _ => Row::generic(item),
-            },
-        )
+        .map(|item| match resource {
+            Some(Resource::Clients) => Row::client(item),
+            Some(Resource::Invoices) => Row::invoice(item),
+            Some(Resource::Payments) => Row::payment(item),
+            Some(Resource::Quotes) => Row::quote(item),
+            Some(Resource::Credits) => Row::credit(item),
+            Some(Resource::Vendors) => Row::vendor(item),
+            Some(Resource::Expenses) => Row::expense(item),
+            Some(Resource::Projects) => Row::project(item),
+            Some(Resource::Tasks) => Row::task(item),
+            Some(Resource::Products) => Row::product(item),
+            Some(Resource::PurchaseOrders) => Row::purchase_order(item),
+            Some(Resource::RecurringInvoices) => Row::invoice_like(item),
+            Some(Resource::RecurringExpenses) => Row::expense(item),
+            Some(Resource::BankTransactions) => Row::bank_transaction(item),
+            Some(_) | None => Row::generic(item),
+        })
         .collect::<Vec<_>>();
 
     if rows.is_empty() {

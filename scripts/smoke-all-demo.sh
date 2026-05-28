@@ -87,6 +87,15 @@ allows_demo_404() {
   return 1
 }
 
+allows_demo_show_skip() {
+  local resource="$1"
+  local status="$2"
+  case "$resource:$status" in
+    activities:HTTP_404 | designs:HTTP_401 | users:HTTP_412) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 echo "== expanded resource read commands =="
 for resource in "${expanded_resources[@]}"; do
   echo "== $resource expanded read commands =="
@@ -99,7 +108,12 @@ for resource in "${expanded_resources[@]}"; do
         echo "$resource show_id=$(jq -r ".data.id // .id // empty" /tmp/koban-"$resource"-show.json)"
       else
         status=$(rg -o "HTTP [0-9]+" /tmp/koban-"$resource"-show.err | head -1 | tr ' ' '_' || true)
-        echo "$resource show skipped=${status:-demo_error}"
+        if allows_demo_show_skip "$resource" "$status"; then
+          echo "$resource show skipped=$status"
+        else
+          cat /tmp/koban-"$resource"-show.err >&2
+          exit 1
+        fi
       fi
     else
       echo "$resource show skipped=no_rows"
