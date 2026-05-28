@@ -28,6 +28,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo check
+      - run: scripts/check-code-health.sh
 
   clippy:
     runs-on: ubuntu-latest
