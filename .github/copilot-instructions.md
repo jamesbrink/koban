@@ -10,8 +10,12 @@ is intentionally a symlink to `AGENTS.md`; do not replace it with a copied file.
 ## Architecture
 
 - `src/main.rs` is the thin binary entry point.
-- `src/lib.rs` owns CLI parsing, config, Invoice Ninja HTTP calls, output
-  shaping, and most unit tests.
+- `src/lib.rs` re-exports the small public surface and wires focused modules.
+- `src/cli.rs` owns clap command definitions and help/completion metadata.
+- `src/api.rs`, `src/config.rs`, and `src/error.rs` own HTTP, environment
+  configuration, and diagnostics.
+- `src/commands.rs`, `src/invoice.rs`, and `src/render.rs` own dispatch,
+  invoice payload/safety helpers, and output shaping.
 - `src/update.rs` owns direct release-tarball self-update behavior.
 - `tests/cli_tests.rs` and `tests/completions_tests.rs` cover user-facing CLI
   behavior.
@@ -35,6 +39,16 @@ Prefer mocked API tests for command behavior.
 Use `INVOICE_NINJA_API_TOKEN` and optional `INVOICE_NINJA_BASE_URL` for config.
 Redact tokens from errors, traces, fixtures, and docs.
 
+## Code Health
+
+Use TDD for behavior changes: write the failing test or regression first, then
+make the narrow implementation change. Keep mocked API coverage for every new
+command path and update completion/help tests when CLI surfaces change.
+
+Avoid god files. Keep modules focused by responsibility, run
+`scripts/check-code-health.sh` or the `code-health` devshell helper after Rust
+refactors, and split files before adding unrelated API families.
+
 ## Validation
 
 Before proposing a change, run the narrowest relevant check. For general Rust
@@ -42,6 +56,8 @@ changes, prefer:
 
 ```sh
 cargo fmt --all -- --check
+cargo check
+scripts/check-code-health.sh
 cargo clippy -- -D warnings
 cargo test
 ```
@@ -54,7 +70,7 @@ sh -n install.sh
 ```
 
 Inside `nix develop`, helper commands include `fmt-check`, `clippy`,
-`run-tests`, `ci-local`, `coverage`, `koban`, `koban-help`, and
+`run-tests`, `ci-local`, `coverage`, `code-health`, `koban`, `koban-help`, and
 `smoke-statics`. `smoke-invoice-write-demo` is demo-only and requires
 `KOBAN_LIVE_WRITE_SMOKE=1`; `smoke-all-demo` runs the broader demo-only command
 smoke suite with the same guard.

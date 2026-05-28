@@ -257,6 +257,7 @@ fmt             cargo fmt
 fmt-check       cargo fmt --all -- --check
 run-tests       cargo test
 ci-local        run the Rust-side CI sequence
+code-health     check Rust source files against module size budgets
 coverage        cargo llvm-cov summary, or --html for a report
 koban           cargo run -- ...
 koban-help      show koban help

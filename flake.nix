@@ -233,10 +233,17 @@
                   set -euo pipefail
                   cargo fmt --all -- --check
                   cargo check
+                  scripts/check-code-health.sh
                   cargo clippy -- -D warnings
                   cargo test
                   cargo build --release
                 '';
+              }
+              {
+                category = "check";
+                name = "code-health";
+                help = "check Rust source files against module size budgets";
+                command = "scripts/check-code-health.sh";
               }
               {
                 category = "check";

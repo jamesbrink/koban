@@ -3,6 +3,18 @@
 Always use conventional commits and proper branch names like `fix/*`, `feat/*`,
 and `chore/*`.
 
+Use TDD for behavior changes: add or update the narrow failing test first, then
+implement the smallest change that makes it pass. Keep tests close to the
+behavior they protect, prefer mocked Invoice Ninja API tests for command
+behavior, and add regression tests for every bug fix.
+
+Protect coverage and code shape proactively. New code must keep the Codecov
+project and patch targets green, and local changes should run the narrowest
+relevant coverage check before review. Avoid god files: keep Rust modules small,
+focused, and easy to review. If a file starts accumulating unrelated command,
+API, rendering, and validation logic, split it before adding more features.
+Run `code-health` or `scripts/check-code-health.sh` when moving Rust modules.
+
 The `main` branch is protected. Use pull requests for changes and keep the
 required CI contexts green: `fmt`, `check`, `clippy`, `test`, and `build`.
 Resolve review conversations before merging.
@@ -29,7 +41,7 @@ read-first, with guarded invoice write commands:
 The Nix devshell intentionally exposes the project helper menu. Keep these
 helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `build-release`, `check`, `clippy`, `fmt`, `fmt-check`, `run-tests`, `ci-local`,
-`coverage`, `koban`, `koban-help`, `smoke-statics`, and
+`coverage`, `code-health`, `koban`, `koban-help`, `smoke-statics`, and
 `smoke-invoice-write-demo`, and `smoke-all-demo`.
 The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
 the gitignored `.env` file when those variables are not already set.
