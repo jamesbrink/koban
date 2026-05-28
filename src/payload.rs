@@ -59,6 +59,13 @@ pub(crate) fn generic_payload(args: GenericPayloadArgs, require_payload: bool) -
 }
 
 pub(crate) fn resource_payload(args: ResourcePayloadArgs, require_payload: bool) -> Result<Value> {
+    let has_raw = args.data.is_some() || args.data_file.is_some() || args.stdin;
+    if has_raw && !args.line_items.is_empty() {
+        return Err(KobanError::InvalidPayload {
+            message: "raw JSON input cannot be combined with --line-item".to_string(),
+        });
+    }
+
     let mut fields = args.fields;
     push_optional_field(&mut fields, "name", args.name);
     push_optional_field(&mut fields, "number", args.number);

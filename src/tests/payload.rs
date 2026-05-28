@@ -66,3 +66,15 @@ fn generic_payload_reports_invalid_sources_and_fields() {
         object_from_fields(vec!["bad..path=value".to_string()]).expect_err("bad dotted path");
     assert!(bad_path.to_string().contains("must not be empty"));
 }
+
+#[test]
+fn resource_payload_rejects_raw_json_with_line_items() {
+    let mut args = empty_resource_payload_args();
+    args.data = Some(r#"{"line_items":[]}"#.to_string());
+    args.line_items
+        .push("product_key=Consulting,quantity=1,cost=100".to_string());
+
+    let error = resource_payload(args, true).expect_err("raw plus line items");
+    assert!(matches!(error, KobanError::InvalidPayload { .. }));
+    assert!(error.to_string().contains("--line-item"), "got: {error}");
+}

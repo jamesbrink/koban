@@ -558,7 +558,7 @@ async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
         let error = execute_with_config(
             Cli {
                 output: OutputFormat::Json,
-                command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
+                command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
                     endpoint: Some("preview".to_string()),
                     method: Some(method),
                     payload: {
@@ -579,6 +579,34 @@ async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
         .expect_err("bodyless endpoint method should reject payload");
         assert!(matches!(error, KobanError::InvalidPayload { .. }));
         assert!(error.to_string().contains(method.label()), "got: {error}");
+    }
+}
+
+#[tokio::test]
+async fn utility_rejects_write_methods() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    for method in [HttpMethod::Post, HttpMethod::Put, HttpMethod::Delete] {
+        let error = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
+                    endpoint: Some("imports/import_1".to_string()),
+                    method: Some(method),
+                    payload: empty_resource_payload_args(),
+                    safety: WriteSafetyArgs {
+                        dry_run: false,
+                        yes: true,
+                    },
+                    include: Vec::new(),
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect_err("utility writes should be rejected");
+        assert!(matches!(error, KobanError::InvalidPayload { .. }));
+        assert!(error.to_string().contains("read-only"), "got: {error}");
     }
 }
 
@@ -613,9 +641,8 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
         then.status(200)
             .json_body(serde_json::json!({"data": {"name": "chart"}}));
     });
-    let utility_delete = server.mock(|when, then| {
-        when.method(httpmock::Method::DELETE)
-            .path("/api/v1/support/ticket_1");
+    let utility_get = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/support/ticket_1");
         then.status(200)
             .json_body(serde_json::json!({"data": {"id": "ticket_1"}}));
     });
@@ -733,11 +760,11 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
             output: OutputFormat::Json,
             command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
                 endpoint: Some("support/ticket_1".to_string()),
-                method: Some(HttpMethod::Delete),
+                method: Some(HttpMethod::Get),
                 payload: empty_resource_payload_args(),
                 safety: WriteSafetyArgs {
                     dry_run: false,
-                    yes: true,
+                    yes: false,
                 },
                 include: Vec::new(),
             }))),
@@ -745,14 +772,14 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
         config,
     )
     .await
-    .expect("utility delete");
+    .expect("utility get");
 
     product_create.assert();
     product_update.assert();
     webhook_delete.assert();
     report_get.assert();
     chart_put.assert();
-    utility_delete.assert();
+    utility_get.assert();
 }
 
 #[tokio::test]

@@ -153,6 +153,9 @@ koban charts run
 koban utility run
 ```
 
+`utility run` is read-only and only sends `GET` requests. Use first-class
+resource commands for mutations.
+
 `<resource>` includes `clients`, `invoices`, `payments`, `quotes`, `credits`,
 `vendors`, `expenses`, `projects`, `tasks`, `locations`, `products`,
 `recurring-invoices`, `purchase-orders`, `recurring-expenses`,
@@ -184,7 +187,8 @@ Write commands accept either one raw JSON source or guided flags. Resource
 writes expose broad guided fields such as `--name`, `--number`, `--client-id`,
 `--vendor-id`, `--project-id`, `--date`, `--due-date`, `--amount`, `--price`,
 `--quantity`, notes, repeatable `--field key=value`, and repeatable
-`--line-item key=value,...` for document-like resources:
+`--line-item key=value,...` for document-like resources. Raw JSON cannot be
+combined with guided fields or `--line-item`.
 
 ```sh
 koban invoices create --data '{"client_id":"...","line_items":[]}' --dry-run

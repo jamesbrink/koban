@@ -239,14 +239,11 @@ async fn execute_inspect_resource(
     resource: Resource,
     command: InspectResourceCommand,
 ) -> Result<String> {
-    match command {
-        InspectResourceCommand::List(args) => {
-            execute_resource(client, output, resource, ResourceCommand::List(args)).await
-        }
-        InspectResourceCommand::Show(args) => {
-            execute_resource(client, output, resource, ResourceCommand::Show(args)).await
-        }
-    }
+    let command = match command {
+        InspectResourceCommand::List(args) => ResourceCommand::List(args),
+        InspectResourceCommand::Show(args) => ResourceCommand::Show(args),
+    };
+    execute_resource(client, output, resource, command).await
 }
 
 async fn execute_resource_create(
@@ -500,6 +497,11 @@ async fn execute_endpoint_run(
     let method = args
         .method
         .unwrap_or_else(|| default_method(default_endpoint));
+    if default_endpoint == "ping" && !matches!(method, HttpMethod::Get) {
+        return Err(KobanError::InvalidPayload {
+            message: "utility endpoint runner is read-only; use --method get".to_string(),
+        });
+    }
     let path = format!("api/v1/{endpoint}");
     let body = resource_payload(
         args.payload,
@@ -514,10 +516,8 @@ async fn execute_endpoint_run(
             ),
         });
     }
-
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-
     if args.safety.dry_run {
         return render_dry_run(
             method.label(),

@@ -177,9 +177,8 @@ koban utility run
 ```
 
 `search`, `reports`, and `charts` default to their matching endpoint names.
-`utility run` defaults to `ping` and accepts `--endpoint` for other utility
-paths such as `health_check`, `preview`, `refresh`, `export`, or scheduler-like
-routes when they are intentionally tested.
+`utility run` defaults to `ping`, accepts `--endpoint` for other utility paths,
+and is read-only: it only sends `GET` requests.
 
 ## Implemented Write Endpoints
 
@@ -195,7 +194,8 @@ GET|POST /api/v1/{resource}/{id}/{action}
 ```
 
 Create and update accept either one raw JSON source (`--data`, `--data-file`, or
-`--stdin`) or guided flags. Generic guided flags cover common fields:
+`--stdin`) or guided flags. Raw JSON cannot be combined with guided fields or
+`--line-item`. Generic guided flags cover common fields:
 `--name`, `--number`, `--client-id`, `--vendor-id`, `--project-id`, `--date`,
 `--due-date`, `--amount`, `--price`, `--quantity`, notes, repeatable
 `--field key=value`, and repeatable `--line-item key=value,...`.
@@ -231,6 +231,7 @@ Safety rules:
   commands require `--yes` unless `--dry-run` is used.
 - Generic endpoint runners require `--yes` for non-GET methods unless
   `--dry-run` is used.
+- `utility run` is read-only and rejects non-GET methods.
 - Generic endpoint runner payload flags are valid only with `POST` and `PUT`;
   `GET` and `DELETE` reject payloads instead of silently dropping request
   bodies.
