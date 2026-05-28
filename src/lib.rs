@@ -32,6 +32,8 @@ Examples:
   koban statics --output json
   koban clients list --page 1 --per-page 20
   koban clients show <client_id> --output json
+  koban invoices template --output json
+  koban invoices edit-template <invoice_id> --output json
 
 Environment:
   INVOICE_NINJA_API_TOKEN  Required API token
@@ -143,6 +145,28 @@ Examples:
   koban clients show k9avmeG1P0 --output json
   koban payments show k9avmeG1P0")]
     Show(ShowArgs),
+
+    /// Fetch a blank/default object template with GET /create
+    #[command(
+        alias = "blank",
+        alias = "new-template",
+        after_help = "\
+Examples:
+  koban clients template --output json
+  koban invoices template --include client --output json"
+    )]
+    Template(TemplateArgs),
+
+    /// Fetch the editable object template with GET /{id}/edit
+    #[command(
+        name = "edit-template",
+        alias = "edit-form",
+        after_help = "\
+Examples:
+  koban clients edit-template k9avmeG1P0 --output json
+  koban payments edit-template k9avmeG1P0"
+    )]
+    EditTemplate(ShowArgs),
 }
 
 #[derive(Debug, Args)]
@@ -165,6 +189,13 @@ pub struct ShowArgs {
     /// Invoice Ninja hashed ID
     pub id: String,
 
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct TemplateArgs {
     /// Related resources to include, comma-separated; repeatable
     #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
     pub include: Vec<String>,
@@ -394,6 +425,27 @@ async fn execute_resource(
 
             let json = client
                 .get_json(&format!("api/v1/{}/{}", resource.path(), args.id), &query)
+                .await?;
+            render_value(output, Some(resource), &json)
+        }
+        ResourceCommand::Template(args) => {
+            let mut query = Vec::new();
+            push_include(&mut query, args.include);
+
+            let json = client
+                .get_json(&format!("api/v1/{}/create", resource.path()), &query)
+                .await?;
+            render_value(output, Some(resource), &json)
+        }
+        ResourceCommand::EditTemplate(args) => {
+            let mut query = Vec::new();
+            push_include(&mut query, args.include);
+
+            let json = client
+                .get_json(
+                    &format!("api/v1/{}/{}/edit", resource.path(), args.id),
+                    &query,
+                )
                 .await?;
             render_value(output, Some(resource), &json)
         }
@@ -1075,6 +1127,22 @@ mod tests {
                 "data": [{"id": "payment_1", "number": "PAY-1"}]
             }));
         });
+        let client_template = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/clients/create")
+                .query_param("include", "contacts");
+            then.status(200).json_body(serde_json::json!({
+                "data": {"id": "", "display_name": "", "contacts": []}
+            }));
+        });
+        let invoice_edit_template = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/invoices/invoice_1/edit")
+                .query_param("include", "client");
+            then.status(200).json_body(serde_json::json!({
+                "data": {"id": "invoice_1", "number": "INV-1", "client": {"display_name": "Ada"}}
+            }));
+        });
 
         let output = execute_with_config(
             Cli {
@@ -1114,15 +1182,46 @@ mod tests {
                     include: vec!["client".to_string(), " ".to_string()],
                 }))),
             },
-            config,
+            config.clone(),
         )
         .await
         .expect("payments list");
         assert!(output.contains("payment_1"), "got: {output}");
 
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Clients(ResourceCommand::Template(TemplateArgs {
+                    include: vec!["contacts".to_string()],
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("client template");
+        assert!(output.contains("contacts"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Invoices(ResourceCommand::EditTemplate(
+                    ShowArgs {
+                        id: "invoice_1".to_string(),
+                        include: vec!["client".to_string()],
+                    },
+                ))),
+            },
+            config,
+        )
+        .await
+        .expect("invoice edit template");
+        assert!(output.contains("invoice_1"), "got: {output}");
+
         clients.assert();
         invoices.assert();
         payments.assert();
+        client_template.assert();
+        invoice_edit_template.assert();
     }
 
     #[tokio::test]

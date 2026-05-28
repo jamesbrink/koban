@@ -5,7 +5,7 @@ because the first development target is James' active Invoice Ninja account. Unt
 we have explicit write safeguards, Koban should only perform read-only requests
 against production data.
 
-Last researched: 2026-05-27.
+Last researched: 2026-05-28.
 
 ## Primary Sources
 
@@ -105,12 +105,12 @@ Client list examples show:
 /api/v1/clients?include=activities,ledger,system_logs
 ```
 
-Design consequences:
+Implemented design:
 
-- Start with explicit `--page` and `--per-page` flags.
-- Add `--include` as a repeatable or comma-separated option once response
-  shaping is stable.
-- Keep raw filter support available for advanced users, but do not invent a
+- List commands expose explicit `--page` and `--per-page` flags.
+- List/show/template/edit-template commands expose repeatable, comma-separated
+  `--include` flags.
+- Keep future raw filter support available for advanced users, but do not invent a
   broad filter DSL in the first pass.
 - Avoid automatic all-page traversal until rate-limit behavior is tested.
 
@@ -140,8 +140,9 @@ GET /api/v1/statics
 ```
 
 The `create` and `edit` routes above return blank/default or editable objects;
-they are read-only `GET` routes despite their names. They may be useful later for
-schema discovery, but Koban's initial CLI should focus on list/show first.
+they are read-only `GET` routes despite their names. Koban exposes them as
+`template` and `edit-template` commands for schema discovery instead of
+user-facing `create` or `edit` verbs.
 
 The search endpoint is useful, but it is a `POST`:
 
@@ -216,6 +217,8 @@ Milestone 1 is now a read-only API foundation:
 5. `koban clients show <id> --output json|table`.
 6. The same list/show pattern for invoices.
 7. The same list/show pattern for payments.
+8. Read-only `template` commands for `GET /api/v1/{resource}/create`.
+9. Read-only `edit-template` commands for `GET /api/v1/{resource}/{id}/edit`.
 
 Safety rules for this milestone:
 
@@ -233,10 +236,16 @@ Implemented command shape:
 koban statics --output json
 koban clients list --page 1 --per-page 20 --output table
 koban clients show <client_id> --output json
+koban clients template --output json
+koban clients edit-template <client_id> --output json
 koban invoices list --page 1 --per-page 20 --output table
 koban invoices show <invoice_id> --output json
+koban invoices template --output json
+koban invoices edit-template <invoice_id> --output json
 koban payments list --page 1 --per-page 20 --output table
 koban payments show <payment_id> --output json
+koban payments template --output json
+koban payments edit-template <payment_id> --output json
 ```
 
 ## Open Questions

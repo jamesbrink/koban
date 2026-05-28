@@ -34,6 +34,16 @@ fn resource_help_includes_examples_and_usage() {
 }
 
 #[test]
+fn resource_help_includes_read_only_template_commands() {
+    koban()
+        .args(["invoices", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("template"))
+        .stdout(predicate::str::contains("edit-template"));
+}
+
+#[test]
 fn version_reports_package_version() {
     koban()
         .arg("--version")
@@ -160,6 +170,76 @@ fn invoices_show_preserves_json_shape() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"custom_field\": \"kept\""));
+
+    mock.assert();
+}
+
+#[test]
+fn clients_template_uses_read_only_create_route() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/clients/create")
+            .query_param("include", "contacts");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "",
+                "display_name": "",
+                "contacts": []
+            }
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "--output",
+            "json",
+            "clients",
+            "template",
+            "--include",
+            "contacts",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"contacts\": []"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoices_edit_template_uses_read_only_edit_route() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/invoices/invoice_1/edit")
+            .query_param("include", "client");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-100",
+                "client": {"display_name": "Ada Lovelace"}
+            }
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "--output",
+            "json",
+            "invoices",
+            "edit-template",
+            "invoice_1",
+            "--include",
+            "client",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"invoice_1\""))
+        .stdout(predicate::str::contains("\"Ada Lovelace\""));
 
     mock.assert();
 }
