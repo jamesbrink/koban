@@ -588,7 +588,7 @@ impl Row {
             status: field(value, &["status"]),
             amount: dash(),
             balance: field(value, &["balance"]),
-            date: field(value, &["created_at"]),
+            date: date_field(value, &["created_at"]),
         }
     }
 
@@ -607,7 +607,7 @@ impl Row {
             status: invoice_status(value),
             amount: field(value, &["amount"]),
             balance: field(value, &["balance"]),
-            date: first_field(value, &[&["due_date"], &["date"], &["created_at"]]),
+            date: first_date_field(value, &[&["due_date"], &["date"], &["created_at"]]),
         }
     }
 
@@ -626,7 +626,7 @@ impl Row {
             status: field(value, &["status"]),
             amount: field(value, &["amount"]),
             balance: dash(),
-            date: first_field(value, &[&["date"], &["created_at"]]),
+            date: first_date_field(value, &[&["date"], &["created_at"]]),
         }
     }
 }
@@ -653,23 +653,43 @@ fn first_field(value: &Value, paths: &[&[&str]]) -> String {
         .unwrap_or_else(dash)
 }
 
+fn first_date_field(value: &Value, paths: &[&[&str]]) -> String {
+    paths
+        .iter()
+        .map(|path| date_field(value, path))
+        .find(|value| value != "-")
+        .unwrap_or_else(dash)
+}
+
+fn date_field(value: &Value, path: &[&str]) -> String {
+    let Some(value) = nested_value(value, path) else {
+        return dash();
+    };
+
+    unix_timestamp(value)
+        .and_then(format_unix_date)
+        .unwrap_or_else(|| field_value(value))
+}
+
 fn field(value: &Value, path: &[&str]) -> String {
+    nested_value(value, path).map_or_else(dash, field_value)
+}
+
+fn nested_value<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
     let mut current = value;
     for segment in path {
         if let Ok(index) = segment.parse::<usize>() {
-            current = match current.get(index) {
-                Some(value) => value,
-                None => return dash(),
-            };
+            current = current.get(index)?;
         } else {
-            current = match current.get(*segment) {
-                Some(value) => value,
-                None => return dash(),
-            };
+            current = current.get(*segment)?;
         }
     }
 
-    match current {
+    Some(current)
+}
+
+fn field_value(value: &Value) -> String {
+    match value {
         Value::Null => dash(),
         Value::String(value) if value.trim().is_empty() => dash(),
         Value::String(value) => value.clone(),
@@ -678,6 +698,52 @@ fn field(value: &Value, path: &[&str]) -> String {
         Value::Array(items) => format!("{} items", items.len()),
         Value::Object(map) => format!("{} fields", map.len()),
     }
+}
+
+fn unix_timestamp(value: &Value) -> Option<i64> {
+    let timestamp = match value {
+        Value::Number(number) => number.as_i64()?,
+        Value::String(value) => value.trim().parse::<i64>().ok()?,
+        _ => return None,
+    };
+
+    Some(if looks_like_reasonable_unix_seconds(timestamp) {
+        timestamp
+    } else {
+        timestamp.div_euclid(1_000)
+    })
+}
+
+fn format_unix_date(timestamp: i64) -> Option<String> {
+    let days = timestamp.div_euclid(86_400);
+    let (year, month, day) = civil_from_days(days)?;
+    Some(format!("{year:04}-{month:02}-{day:02}"))
+}
+
+fn looks_like_reasonable_unix_seconds(timestamp: i64) -> bool {
+    let days = timestamp.div_euclid(86_400);
+    civil_from_days(days).is_some_and(|(year, _, _)| (1900..=9999).contains(&year))
+}
+
+fn civil_from_days(days: i64) -> Option<(i32, u32, u32)> {
+    let z = days.checked_add(719_468)?;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let mut year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = mp + if mp < 10 { 3 } else { -9 };
+    if month <= 2 {
+        year += 1;
+    }
+
+    Some((
+        year.try_into().ok()?,
+        month.try_into().ok()?,
+        day.try_into().ok()?,
+    ))
 }
 
 fn dash() -> String {
@@ -857,12 +923,19 @@ mod tests {
 
     #[test]
     fn table_output_renders_client_fields() {
-        let value =
-            serde_json::json!({"data": [{"id": "abc", "display_name": "Ada", "balance": 12.5}]});
+        let value = serde_json::json!({
+            "data": [{
+                "id": "abc",
+                "display_name": "Ada",
+                "balance": 12.5,
+                "created_at": 1744305114
+            }]
+        });
         let output =
             render_value(OutputFormat::Table, Some(Resource::Clients), &value).expect("table");
         assert!(output.contains("Ada"), "got: {output}");
         assert!(output.contains("12.5"), "got: {output}");
+        assert!(output.contains("2025-04-10"), "got: {output}");
     }
 
     #[test]
@@ -996,6 +1069,22 @@ mod tests {
         assert_eq!(value_kind(&serde_json::json!(false)), "boolean");
         assert_eq!(value_kind(&Value::Null), "null");
         assert_eq!(value_len(&serde_json::json!("x")), 1);
+    }
+
+    #[test]
+    fn date_field_formats_unix_timestamps_and_preserves_date_strings() {
+        let value = serde_json::json!({
+            "created_at": 1744305114,
+            "updated_at": "1730754263000",
+            "legacy_millis": 946684800000_i64,
+            "date": "2026-05-16"
+        });
+
+        assert_eq!(date_field(&value, &["created_at"]), "2025-04-10");
+        assert_eq!(date_field(&value, &["updated_at"]), "2024-11-04");
+        assert_eq!(date_field(&value, &["legacy_millis"]), "2000-01-01");
+        assert_eq!(date_field(&value, &["date"]), "2026-05-16");
+        assert_eq!(date_field(&value, &["missing"]), "-");
     }
 
     #[test]
