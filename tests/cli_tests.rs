@@ -1,5 +1,8 @@
 use assert_cmd::Command;
-use httpmock::{Method::GET, MockServer};
+use httpmock::{
+    Method::{DELETE, GET, POST, PUT},
+    MockServer,
+};
 use predicates::prelude::*;
 use serde_json::json;
 use tempfile::tempdir;
@@ -19,7 +22,7 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
             "clients      List, show, and inspect clients",
         ))
         .stdout(predicate::str::contains(
-            "invoices     List, show, inspect, and download invoices",
+            "invoices     List, show, create, update, and manage invoices",
         ))
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
@@ -61,6 +64,12 @@ fn resource_help_includes_read_only_template_commands() {
             "template       Show the default invoice template",
         ))
         .stdout(predicate::str::contains("edit-template"))
+        .stdout(predicate::str::contains("create"))
+        .stdout(predicate::str::contains("update"))
+        .stdout(predicate::str::contains("delete"))
+        .stdout(predicate::str::contains("bulk"))
+        .stdout(predicate::str::contains("upload"))
+        .stdout(predicate::str::contains("action"))
         .stdout(predicate::str::contains("download"))
         .stdout(predicate::str::contains("delivery-note"));
 }
@@ -571,6 +580,440 @@ fn invoices_edit_template_uses_read_only_edit_route() {
         .stdout(predicate::str::contains("\"Ada Lovelace\""));
 
     mock.assert();
+}
+
+#[test]
+fn invoice_create_dry_run_renders_guided_payload_without_network() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "create",
+            "--client-id",
+            "client_1",
+            "--date",
+            "2026-05-28",
+            "--line-item",
+            "product_key=Consulting,quantity=1,cost=125,tax_rate1=8.5",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dry_run\": true"))
+        .stdout(predicate::str::contains("\"method\": \"POST\""))
+        .stdout(predicate::str::contains("\"path\": \"api/v1/invoices\""))
+        .stdout(predicate::str::contains("\"client_id\": \"client_1\""))
+        .stdout(predicate::str::contains("\"quantity\": 1"))
+        .stdout(predicate::str::contains("\"tax_rate1\": 8.5"));
+}
+
+#[test]
+fn invoice_create_accepts_raw_json_data() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "create",
+            "--data",
+            r#"{"client_id":"client_1","line_items":[]}"#,
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"client_id\": \"client_1\""))
+        .stdout(predicate::str::contains("\"line_items\": []"));
+}
+
+#[test]
+fn invoice_create_posts_guided_payload_and_trigger_query() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/invoices")
+            .query_param("include", "client")
+            .query_param("mark_sent", "true")
+            .header("X-API-TOKEN", "test-token")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .json_body(json!({
+                "client_id": "client_1",
+                "public_notes": "Thanks",
+                "line_items": [{
+                    "product_key": "Consulting",
+                    "quantity": 2,
+                    "cost": 125
+                }]
+            }));
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-1",
+                "client_id": "client_1",
+                "status_id": 2
+            }
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "invoices",
+            "create",
+            "--client-id",
+            "client_1",
+            "--public-notes",
+            "Thanks",
+            "--line-item",
+            "product_key=Consulting,quantity=2,cost=125",
+            "--mark-sent",
+            "--include",
+            "client",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("INV-1"))
+        .stdout(predicate::str::contains("sent"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_create_send_email_requires_confirmation() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "create",
+            "--client-id",
+            "client_1",
+            "--line-item",
+            "product_key=Consulting,quantity=1,cost=100",
+            "--send-email",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("confirmation required"))
+        .stderr(predicate::str::contains("--dry-run"))
+        .stderr(predicate::str::contains("--yes"));
+}
+
+#[test]
+fn invoice_create_trigger_only_still_requires_payload() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args(["invoices", "create", "--mark-sent", "--dry-run"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("create requires JSON input"));
+}
+
+#[test]
+fn invoice_amount_paid_requires_paid_flag() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "update",
+            "invoice_1",
+            "--public-notes",
+            "paid",
+            "--amount-paid",
+            "10",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--amount-paid requires --paid"));
+}
+
+#[test]
+fn invoice_update_reads_payload_file_and_confirms_paid_trigger() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(PUT)
+            .path("/api/v1/invoices/invoice_1")
+            .query_param("paid", "true")
+            .query_param("amount_paid", "125")
+            .json_body(json!({
+                "public_notes": "Paid at counter"
+            }));
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-1",
+                "status_id": 4,
+                "public_notes": "Paid at counter"
+            }
+        }));
+    });
+    let dir = tempdir().expect("tempdir");
+    let payload = dir.path().join("invoice.json");
+    std::fs::write(&payload, r#"{"public_notes":"Paid at counter"}"#).expect("payload");
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args(["invoices", "update", "invoice_1", "--data-file"])
+        .arg(&payload)
+        .args(["--paid", "--amount-paid", "125", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("paid"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_update_can_read_json_from_stdin() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(PUT)
+            .path("/api/v1/invoices/invoice_1")
+            .json_body(json!({"private_notes": "stdin payload"}));
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-1",
+                "private_notes": "stdin payload"
+            }
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args(["invoices", "update", "invoice_1", "--stdin"])
+        .write_stdin(r#"{"private_notes":"stdin payload"}"#)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("INV-1"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_delete_requires_yes_but_allows_dry_run() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args(["invoices", "delete", "invoice_1"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("confirmation required"));
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args(["invoices", "delete", "invoice_1", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"method\": \"DELETE\""))
+        .stdout(predicate::str::contains(
+            "\"path\": \"api/v1/invoices/invoice_1\"",
+        ));
+}
+
+#[test]
+fn invoice_delete_with_yes_calls_delete_route() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(DELETE)
+            .path("/api/v1/invoices/invoice_1")
+            .query_param("include", "client");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-1",
+                "status_id": 5
+            }
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "invoices",
+            "delete",
+            "invoice_1",
+            "--include",
+            "client",
+            "--yes",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("cancelled"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_bulk_posts_action_payload_when_confirmed() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/invoices/bulk")
+            .json_body(json!({
+                "action": "email",
+                "ids": ["invoice_1", "invoice_2"],
+                "email_type": "invoice"
+            }));
+        then.status(200).json_body(json!({
+            "data": [{"id": "invoice_1", "status_id": 2}]
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "invoices",
+            "bulk",
+            "--action",
+            "email",
+            "--email-type",
+            "invoice",
+            "--id",
+            "invoice_1",
+            "--id",
+            "invoice_2",
+            "--yes",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sent"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_action_uses_custom_action_route_when_confirmed() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/invoices/invoice_1/mark_paid")
+            .query_param("include", "client");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-1",
+                "status_id": 4
+            }
+        }));
+    });
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "invoices",
+            "action",
+            "invoice_1",
+            "--action",
+            "mark_paid",
+            "--include",
+            "client",
+            "--yes",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("paid"));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_action_rejects_unsafe_path_segments() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "action",
+            "invoice_1",
+            "--action",
+            "../clients",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("safe single path"));
+}
+
+#[test]
+fn invoice_upload_puts_multipart_when_confirmed() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(PUT)
+            .path("/api/v1/invoices/invoice_1/upload")
+            .query_param("include", "documents")
+            .header("X-API-TOKEN", "test-token");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "invoice_1",
+                "number": "INV-1",
+                "documents": [{"name": "note.txt"}]
+            }
+        }));
+    });
+    let dir = tempdir().expect("tempdir");
+    let file = dir.path().join("note.txt");
+    std::fs::write(&file, "hello").expect("upload fixture");
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "--output",
+            "json",
+            "invoices",
+            "upload",
+            "invoice_1",
+            "--file",
+        ])
+        .arg(&file)
+        .args(["--include", "documents", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"note.txt\""));
+
+    mock.assert();
+}
+
+#[test]
+fn invoice_payload_validation_is_actionable_without_network() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "create",
+            "--data",
+            "{\"client_id\":\"client_1\"}",
+            "--client-id",
+            "client_1",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invoice payload is not valid"))
+        .stderr(predicate::str::contains(
+            "raw JSON input cannot be combined",
+        ));
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args(["invoices", "create", "--data", "[]"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "invoice payload must be a JSON object",
+        ));
 }
 
 #[test]

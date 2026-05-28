@@ -5,6 +5,7 @@
 
 use std::{
     env, fmt, fs,
+    io::{self, Read},
     path::{Path, PathBuf},
 };
 
@@ -28,7 +29,7 @@ const REQUESTED_WITH: &str = "XMLHttpRequest";
     name = "koban",
     version,
     about = "Invoice Ninja from the terminal",
-    long_about = "koban is a read-only Invoice Ninja CLI for humans and AI agents.",
+    long_about = "koban is an Invoice Ninja CLI for humans and AI agents.",
     arg_required_else_help = true,
     propagate_version = true,
     term_width = 100,
@@ -37,6 +38,9 @@ Examples:
   koban statics --output json
   koban clients list --page 1 --per-page 20
   koban clients show <client_id> --output json
+  koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
+  koban invoices update <invoice_id> --data-file invoice.json --dry-run
+  koban invoices delete <invoice_id> --yes
   koban invoices download <invitation_key> --output-file invoice.pdf
   koban invoices template --output json
   koban invoices edit-template <invoice_id> --output json
@@ -107,9 +111,9 @@ Examples:
     #[command(subcommand)]
     Clients(ResourceCommand),
 
-    /// List, show, inspect, and download invoices
+    /// List, show, create, update, and manage invoices
     #[command(subcommand)]
-    Invoices(InvoiceCommand),
+    Invoices(Box<InvoiceCommand>),
 
     /// List, show, and inspect payments
     #[command(subcommand)]
@@ -268,6 +272,49 @@ Examples:
     )]
     EditTemplate(ShowArgs),
 
+    /// Create a draft invoice
+    #[command(after_help = "\
+Examples:
+  koban invoices create --client-id k9avmeG1P0 --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
+  koban invoices create --data-file invoice.json --include client
+  printf '%s' '{\"client_id\":\"k9avmeG1P0\",\"line_items\":[]}' | koban invoices create --stdin --dry-run")]
+    Create(InvoiceWriteArgs),
+
+    /// Update an invoice by hashed ID
+    #[command(after_help = "\
+Examples:
+  koban invoices update k9avmeG1P0 --data-file invoice.json --dry-run
+  koban invoices update k9avmeG1P0 --public-notes 'Thanks again' --mark-sent --yes")]
+    Update(UpdateInvoiceArgs),
+
+    /// Delete an invoice by hashed ID
+    #[command(after_help = "\
+Examples:
+  koban invoices delete k9avmeG1P0 --dry-run
+  koban invoices delete k9avmeG1P0 --yes")]
+    Delete(ConfirmableIdArgs),
+
+    /// Run a bulk invoice action
+    #[command(after_help = "\
+Examples:
+  koban invoices bulk --action archive --id inv_1 --id inv_2 --dry-run
+  koban invoices bulk --action email --email-type invoice --id inv_1 --yes")]
+    Bulk(BulkArgs),
+
+    /// Upload documents to an invoice
+    #[command(after_help = "\
+Examples:
+  koban invoices upload k9avmeG1P0 --file contract.pdf --dry-run
+  koban invoices upload k9avmeG1P0 --file contract.pdf --yes")]
+    Upload(UploadArgs),
+
+    /// Run a single-invoice action
+    #[command(after_help = "\
+Examples:
+  koban invoices action k9avmeG1P0 --action mark_paid --dry-run
+  koban invoices action k9avmeG1P0 --action email --yes")]
+    Action(InvoiceActionArgs),
+
     /// Save an invoice PDF by invitation key
     #[command(after_help = "\
 Examples:
@@ -346,6 +393,215 @@ pub struct DownloadArgs {
     /// Overwrite the output file if it already exists
     #[arg(long)]
     pub force: bool,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct InvoiceWriteArgs {
+    #[command(flatten)]
+    pub payload: InvoicePayloadArgs,
+
+    #[command(flatten)]
+    pub triggers: InvoiceTriggerArgs,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct UpdateInvoiceArgs {
+    /// Invoice Ninja hashed ID
+    pub id: String,
+
+    #[command(flatten)]
+    pub payload: InvoicePayloadArgs,
+
+    #[command(flatten)]
+    pub triggers: InvoiceTriggerArgs,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct InvoicePayloadArgs {
+    /// Raw invoice JSON payload
+    #[arg(long, value_name = "JSON", conflicts_with_all = ["data_file", "stdin"])]
+    pub data: Option<String>,
+
+    /// Read invoice JSON payload from a file
+    #[arg(long = "data-file", value_name = "PATH", conflicts_with_all = ["data", "stdin"])]
+    pub data_file: Option<PathBuf>,
+
+    /// Read invoice JSON payload from standard input
+    #[arg(long, conflicts_with_all = ["data", "data_file"])]
+    pub stdin: bool,
+
+    /// Client hashed ID
+    #[arg(long)]
+    pub client_id: Option<String>,
+
+    /// Invoice date, usually YYYY-MM-DD
+    #[arg(long)]
+    pub date: Option<String>,
+
+    /// Due date, usually YYYY-MM-DD
+    #[arg(long)]
+    pub due_date: Option<String>,
+
+    /// Invoice number
+    #[arg(long)]
+    pub number: Option<String>,
+
+    /// Purchase order number
+    #[arg(long)]
+    pub po_number: Option<String>,
+
+    /// Public client-facing notes
+    #[arg(long)]
+    pub public_notes: Option<String>,
+
+    /// Private internal notes
+    #[arg(long)]
+    pub private_notes: Option<String>,
+
+    /// Invoice terms
+    #[arg(long)]
+    pub terms: Option<String>,
+
+    /// Invoice footer
+    #[arg(long)]
+    pub footer: Option<String>,
+
+    /// Project hashed ID
+    #[arg(long)]
+    pub project_id: Option<String>,
+
+    /// Line item as comma-separated key=value pairs; repeatable
+    #[arg(long = "line-item", value_name = "key=value,...", action = clap::ArgAction::Append)]
+    pub line_items: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct InvoiceTriggerArgs {
+    /// Save and send the invoice email
+    #[arg(long)]
+    pub send_email: bool,
+
+    /// Save and mark the invoice as sent
+    #[arg(long)]
+    pub mark_sent: bool,
+
+    /// Save and mark the invoice as paid
+    #[arg(long)]
+    pub paid: bool,
+
+    /// Amount paid to record with --paid
+    #[arg(long)]
+    pub amount_paid: Option<String>,
+
+    /// Save and mark the invoice as cancelled
+    #[arg(long)]
+    pub cancel: bool,
+
+    /// Save the footer as the default footer
+    #[arg(long)]
+    pub save_default_footer: bool,
+
+    /// Save the terms as the default terms
+    #[arg(long)]
+    pub save_default_terms: bool,
+
+    /// Retry e-send for the invoice
+    #[arg(long)]
+    pub retry_e_send: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct WriteSafetyArgs {
+    /// Print the request that would be sent without calling Invoice Ninja
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Confirm a destructive or externally visible mutation
+    #[arg(long)]
+    pub yes: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ConfirmableIdArgs {
+    /// Invoice Ninja hashed ID
+    pub id: String,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct BulkArgs {
+    /// Bulk action to perform, such as archive, restore, delete, email, or bulk_download
+    #[arg(long)]
+    pub action: String,
+
+    /// Invoice hashed ID; repeatable
+    #[arg(long = "id", value_name = "ID", action = clap::ArgAction::Append, required = true)]
+    pub ids: Vec<String>,
+
+    /// Email type for bulk email actions
+    #[arg(long)]
+    pub email_type: Option<String>,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct UploadArgs {
+    /// Invoice Ninja hashed ID
+    pub id: String,
+
+    /// File to upload; repeatable
+    #[arg(long = "file", value_name = "PATH", action = clap::ArgAction::Append, required = true)]
+    pub files: Vec<PathBuf>,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct InvoiceActionArgs {
+    /// Invoice Ninja hashed ID
+    pub id: String,
+
+    /// Invoice action, such as mark_paid, archive, delete, email, or clone_to_quote
+    #[arg(long)]
+    pub action: String,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
 
     /// Related resources to include, comma-separated; repeatable
     #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
@@ -477,6 +733,18 @@ pub enum KobanError {
     #[diagnostic(help("Use key=value, for example `--filter balance=gt:1000`."))]
     InvalidFilter { value: String },
 
+    #[error("invoice payload is not valid: {message}")]
+    #[diagnostic(help(
+        "Use one raw JSON source (--data, --data-file, or --stdin), or build a payload with guided flags such as --client-id and --line-item."
+    ))]
+    InvalidPayload { message: String },
+
+    #[error("confirmation required for {operation}")]
+    #[diagnostic(help(
+        "Review the command with --dry-run, then rerun with --yes when you intentionally want to perform this mutation."
+    ))]
+    ConfirmationRequired { operation: String },
+
     #[error("could not write download file: {message}")]
     #[diagnostic(help(
         "Choose a path in an existing directory. Use --force if you intentionally want to overwrite an existing file."
@@ -554,6 +822,106 @@ impl ApiClient {
         })
     }
 
+    pub async fn post_json(
+        &self,
+        path: &str,
+        query: &[(String, String)],
+        body: &Value,
+    ) -> Result<Value> {
+        let url = self.endpoint(path, query)?;
+        let endpoint = endpoint_label(&url);
+        let response = self
+            .http
+            .post(url)
+            .header("X-API-TOKEN", &self.config.api_token)
+            .header("X-Requested-With", REQUESTED_WITH)
+            .json(body)
+            .send()
+            .await
+            .map_err(|source| KobanError::Transport {
+                message: redact(source.to_string(), &self.config.api_token),
+            })?;
+
+        self.json_response(response, endpoint).await
+    }
+
+    pub async fn put_json(
+        &self,
+        path: &str,
+        query: &[(String, String)],
+        body: &Value,
+    ) -> Result<Value> {
+        let url = self.endpoint(path, query)?;
+        let endpoint = endpoint_label(&url);
+        let response = self
+            .http
+            .put(url)
+            .header("X-API-TOKEN", &self.config.api_token)
+            .header("X-Requested-With", REQUESTED_WITH)
+            .json(body)
+            .send()
+            .await
+            .map_err(|source| KobanError::Transport {
+                message: redact(source.to_string(), &self.config.api_token),
+            })?;
+
+        self.json_response(response, endpoint).await
+    }
+
+    pub async fn delete_json(&self, path: &str, query: &[(String, String)]) -> Result<Value> {
+        let url = self.endpoint(path, query)?;
+        let endpoint = endpoint_label(&url);
+        let response = self
+            .http
+            .delete(url)
+            .header("X-API-TOKEN", &self.config.api_token)
+            .header("X-Requested-With", REQUESTED_WITH)
+            .send()
+            .await
+            .map_err(|source| KobanError::Transport {
+                message: redact(source.to_string(), &self.config.api_token),
+            })?;
+
+        self.json_response(response, endpoint).await
+    }
+
+    pub async fn put_multipart(
+        &self,
+        path: &str,
+        query: &[(String, String)],
+        files: &[PathBuf],
+    ) -> Result<Value> {
+        let url = self.endpoint(path, query)?;
+        let endpoint = endpoint_label(&url);
+        let mut form = reqwest::multipart::Form::new();
+
+        for path in files {
+            let bytes = fs::read(path).map_err(|source| KobanError::File {
+                message: format!("could not read {}: {source}", path.display()),
+            })?;
+            let file_name = path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "document".to_string());
+            let part = reqwest::multipart::Part::bytes(bytes).file_name(file_name);
+            form = form.part("documents[]", part);
+        }
+
+        let response = self
+            .http
+            .put(url)
+            .header("X-API-TOKEN", &self.config.api_token)
+            .header("X-Requested-With", REQUESTED_WITH)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|source| KobanError::Transport {
+                message: redact(source.to_string(), &self.config.api_token),
+            })?;
+
+        self.json_response(response, endpoint).await
+    }
+
     pub async fn get_bytes(&self, path: &str, query: &[(String, String)]) -> Result<Vec<u8>> {
         let url = self.endpoint(path, query)?;
         let endpoint = endpoint_label(&url);
@@ -582,6 +950,21 @@ impl ApiClient {
             let body = String::from_utf8_lossy(&bytes).to_string();
             Err(api_error(status, endpoint, body, &self.config.api_token))
         }
+    }
+
+    async fn json_response(&self, response: reqwest::Response, endpoint: String) -> Result<Value> {
+        let status = response.status();
+        let body = response.text().await.map_err(|source| KobanError::Decode {
+            message: redact(source.to_string(), &self.config.api_token),
+        })?;
+
+        if !status.is_success() {
+            return Err(api_error(status, endpoint, body, &self.config.api_token));
+        }
+
+        serde_json::from_str(&body).map_err(|source| KobanError::Decode {
+            message: redact(source.to_string(), &self.config.api_token),
+        })
     }
 }
 
@@ -615,7 +998,7 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Clients(command)) => {
             execute_resource(&client, output, Resource::Clients, command).await
         }
-        Some(Commands::Invoices(command)) => execute_invoice(&client, output, command).await,
+        Some(Commands::Invoices(command)) => execute_invoice(&client, output, *command).await,
         Some(Commands::Payments(command)) => {
             execute_resource(&client, output, Resource::Payments, command).await
         }
@@ -722,6 +1105,12 @@ async fn execute_invoice(
             )
             .await
         }
+        InvoiceCommand::Create(args) => execute_invoice_create(client, output, args).await,
+        InvoiceCommand::Update(args) => execute_invoice_update(client, output, args).await,
+        InvoiceCommand::Delete(args) => execute_invoice_delete(client, output, args).await,
+        InvoiceCommand::Bulk(args) => execute_invoice_bulk(client, output, args).await,
+        InvoiceCommand::Upload(args) => execute_invoice_upload(client, output, args).await,
+        InvoiceCommand::Action(args) => execute_invoice_action(client, output, args).await,
         InvoiceCommand::Download(args) => {
             execute_download(client, "api/v1/invoice", "download", args).await
         }
@@ -764,6 +1153,148 @@ async fn execute_list(
     )
     .await?;
     render_value(output, Some(resource), &json)
+}
+
+async fn execute_invoice_create(
+    client: &ApiClient,
+    output: OutputFormat,
+    args: InvoiceWriteArgs,
+) -> Result<String> {
+    validate_invoice_triggers(&args.triggers)?;
+    let body = invoice_payload(args.payload, true, false)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    push_invoice_triggers(&mut query, &args.triggers);
+
+    if args.triggers.requires_confirmation() {
+        require_confirmation(
+            "invoice create with email, paid, cancel, or retry action",
+            &args.safety,
+        )?;
+    }
+
+    if args.safety.dry_run {
+        return render_dry_run("POST", "api/v1/invoices", &query, Some(&body), None);
+    }
+
+    let json = client.post_json("api/v1/invoices", &query, &body).await?;
+    render_value(output, Some(Resource::Invoices), &json)
+}
+
+async fn execute_invoice_update(
+    client: &ApiClient,
+    output: OutputFormat,
+    args: UpdateInvoiceArgs,
+) -> Result<String> {
+    validate_invoice_triggers(&args.triggers)?;
+    let body = invoice_payload(args.payload, false, args.triggers.has_any())?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    push_invoice_triggers(&mut query, &args.triggers);
+
+    if args.triggers.requires_confirmation() {
+        require_confirmation(
+            "invoice update with email, paid, cancel, or retry action",
+            &args.safety,
+        )?;
+    }
+
+    let path = format!("api/v1/invoices/{}", args.id);
+    if args.safety.dry_run {
+        return render_dry_run("PUT", &path, &query, Some(&body), None);
+    }
+
+    let json = client.put_json(&path, &query, &body).await?;
+    render_value(output, Some(Resource::Invoices), &json)
+}
+
+async fn execute_invoice_delete(
+    client: &ApiClient,
+    output: OutputFormat,
+    args: ConfirmableIdArgs,
+) -> Result<String> {
+    require_confirmation("invoice delete", &args.safety)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+
+    let path = format!("api/v1/invoices/{}", args.id);
+    if args.safety.dry_run {
+        return render_dry_run("DELETE", &path, &query, None, None);
+    }
+
+    let json = client.delete_json(&path, &query).await?;
+    render_value(output, Some(Resource::Invoices), &json)
+}
+
+async fn execute_invoice_bulk(
+    client: &ApiClient,
+    output: OutputFormat,
+    args: BulkArgs,
+) -> Result<String> {
+    require_confirmation("invoice bulk action", &args.safety)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+
+    let mut body = serde_json::Map::new();
+    body.insert("action".to_string(), Value::String(args.action));
+    body.insert(
+        "ids".to_string(),
+        Value::Array(args.ids.into_iter().map(Value::String).collect()),
+    );
+    if let Some(email_type) = args.email_type {
+        body.insert("email_type".to_string(), Value::String(email_type));
+    }
+    let body = Value::Object(body);
+
+    if args.safety.dry_run {
+        return render_dry_run("POST", "api/v1/invoices/bulk", &query, Some(&body), None);
+    }
+
+    let json = client
+        .post_json("api/v1/invoices/bulk", &query, &body)
+        .await?;
+    render_value(output, Some(Resource::Invoices), &json)
+}
+
+async fn execute_invoice_upload(
+    client: &ApiClient,
+    output: OutputFormat,
+    args: UploadArgs,
+) -> Result<String> {
+    require_confirmation("invoice document upload", &args.safety)?;
+    for file in &args.files {
+        ensure_upload_file(file)?;
+    }
+
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/invoices/{}/upload", args.id);
+
+    if args.safety.dry_run {
+        return render_dry_run("PUT", &path, &query, None, Some(&args.files));
+    }
+
+    let json = client.put_multipart(&path, &query, &args.files).await?;
+    render_value(output, Some(Resource::Invoices), &json)
+}
+
+async fn execute_invoice_action(
+    client: &ApiClient,
+    output: OutputFormat,
+    args: InvoiceActionArgs,
+) -> Result<String> {
+    require_confirmation("invoice action", &args.safety)?;
+    validate_path_segment("invoice action", &args.action)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/invoices/{}/{}", args.id, args.action);
+
+    if args.safety.dry_run {
+        return render_dry_run("GET", &path, &query, None, None);
+    }
+
+    let json = client.get_json(&path, &query).await?;
+    render_value(output, Some(Resource::Invoices), &json)
 }
 
 async fn execute_download(
@@ -858,6 +1389,267 @@ fn ensure_download_path(path: &Path, force: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn ensure_upload_file(path: &Path) -> Result<()> {
+    let metadata = fs::metadata(path).map_err(|source| KobanError::File {
+        message: format!("could not read {}: {source}", path.display()),
+    })?;
+    if !metadata.is_file() {
+        return Err(KobanError::File {
+            message: format!("{} is not a file", path.display()),
+        });
+    }
+    Ok(())
+}
+
+fn require_confirmation(operation: &str, safety: &WriteSafetyArgs) -> Result<()> {
+    if safety.dry_run || safety.yes {
+        Ok(())
+    } else {
+        Err(KobanError::ConfirmationRequired {
+            operation: operation.to_string(),
+        })
+    }
+}
+
+fn validate_invoice_triggers(triggers: &InvoiceTriggerArgs) -> Result<()> {
+    if triggers.amount_paid.is_some() && !triggers.paid {
+        return Err(KobanError::InvalidPayload {
+            message: "--amount-paid requires --paid".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_path_segment(label: &str, value: &str) -> Result<()> {
+    let is_safe = !value.is_empty()
+        && value != "."
+        && value != ".."
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'));
+
+    if is_safe {
+        Ok(())
+    } else {
+        Err(KobanError::InvalidPayload {
+            message: format!("{label} must be a safe single path segment"),
+        })
+    }
+}
+
+fn invoice_payload(
+    args: InvoicePayloadArgs,
+    require_payload: bool,
+    allow_empty_for_trigger: bool,
+) -> Result<Value> {
+    let has_raw = args.data.is_some() || args.data_file.is_some() || args.stdin;
+    let has_guided = args.has_guided_fields();
+
+    if has_raw && has_guided {
+        return Err(KobanError::InvalidPayload {
+            message: "raw JSON input cannot be combined with guided invoice flags".to_string(),
+        });
+    }
+
+    if let Some(data) = args.data {
+        return parse_json_payload(&data);
+    }
+    if let Some(path) = args.data_file {
+        let data = fs::read_to_string(&path).map_err(|source| KobanError::InvalidPayload {
+            message: format!("could not read {}: {source}", path.display()),
+        })?;
+        return parse_json_payload(&data);
+    }
+    if args.stdin {
+        let mut data = String::new();
+        io::stdin()
+            .read_to_string(&mut data)
+            .map_err(|source| KobanError::InvalidPayload {
+                message: format!("could not read standard input: {source}"),
+            })?;
+        return parse_json_payload(&data);
+    }
+
+    if has_guided {
+        return guided_invoice_payload(args);
+    }
+
+    if allow_empty_for_trigger {
+        return Ok(json!({}));
+    }
+
+    if require_payload {
+        Err(KobanError::InvalidPayload {
+            message: "create requires JSON input or guided invoice flags".to_string(),
+        })
+    } else {
+        Err(KobanError::InvalidPayload {
+            message: "update requires JSON input, guided invoice flags, or a trigger flag"
+                .to_string(),
+        })
+    }
+}
+
+fn parse_json_payload(data: &str) -> Result<Value> {
+    let value =
+        serde_json::from_str::<Value>(data).map_err(|source| KobanError::InvalidPayload {
+            message: format!("JSON could not be parsed: {source}"),
+        })?;
+    if !value.is_object() {
+        return Err(KobanError::InvalidPayload {
+            message: "invoice payload must be a JSON object".to_string(),
+        });
+    }
+    Ok(value)
+}
+
+fn guided_invoice_payload(args: InvoicePayloadArgs) -> Result<Value> {
+    let mut body = serde_json::Map::new();
+    insert_string(&mut body, "client_id", args.client_id);
+    insert_string(&mut body, "date", args.date);
+    insert_string(&mut body, "due_date", args.due_date);
+    insert_string(&mut body, "number", args.number);
+    insert_string(&mut body, "po_number", args.po_number);
+    insert_string(&mut body, "public_notes", args.public_notes);
+    insert_string(&mut body, "private_notes", args.private_notes);
+    insert_string(&mut body, "terms", args.terms);
+    insert_string(&mut body, "footer", args.footer);
+    insert_string(&mut body, "project_id", args.project_id);
+
+    if !args.line_items.is_empty() {
+        let line_items = args
+            .line_items
+            .into_iter()
+            .map(|line_item| parse_line_item(&line_item))
+            .collect::<Result<Vec<_>>>()?;
+        body.insert("line_items".to_string(), Value::Array(line_items));
+    }
+
+    Ok(Value::Object(body))
+}
+
+fn insert_string(map: &mut serde_json::Map<String, Value>, key: &str, value: Option<String>) {
+    if let Some(value) = value {
+        map.insert(key.to_string(), Value::String(value));
+    }
+}
+
+fn parse_line_item(input: &str) -> Result<Value> {
+    let mut item = serde_json::Map::new();
+    for part in input.split(',') {
+        let Some((key, value)) = part.split_once('=') else {
+            return Err(KobanError::InvalidPayload {
+                message: format!("line item part `{part}` must use key=value"),
+            });
+        };
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(KobanError::InvalidPayload {
+                message: format!("line item part `{part}` has an empty key"),
+            });
+        }
+        item.insert(key.to_string(), parse_scalar(value.trim()));
+    }
+
+    if item.is_empty() {
+        return Err(KobanError::InvalidPayload {
+            message: "line item cannot be empty".to_string(),
+        });
+    }
+
+    Ok(Value::Object(item))
+}
+
+fn parse_scalar(value: &str) -> Value {
+    if value.eq_ignore_ascii_case("true") {
+        Value::Bool(true)
+    } else if value.eq_ignore_ascii_case("false") {
+        Value::Bool(false)
+    } else if value.eq_ignore_ascii_case("null") {
+        Value::Null
+    } else if let Ok(number) = value.parse::<serde_json::Number>() {
+        Value::Number(number)
+    } else {
+        Value::String(value.to_string())
+    }
+}
+
+impl InvoicePayloadArgs {
+    fn has_guided_fields(&self) -> bool {
+        self.client_id.is_some()
+            || self.date.is_some()
+            || self.due_date.is_some()
+            || self.number.is_some()
+            || self.po_number.is_some()
+            || self.public_notes.is_some()
+            || self.private_notes.is_some()
+            || self.terms.is_some()
+            || self.footer.is_some()
+            || self.project_id.is_some()
+            || !self.line_items.is_empty()
+    }
+}
+
+impl InvoiceTriggerArgs {
+    fn has_any(&self) -> bool {
+        self.send_email
+            || self.mark_sent
+            || self.paid
+            || self.amount_paid.is_some()
+            || self.cancel
+            || self.save_default_footer
+            || self.save_default_terms
+            || self.retry_e_send
+    }
+
+    fn requires_confirmation(&self) -> bool {
+        self.send_email
+            || self.paid
+            || self.amount_paid.is_some()
+            || self.cancel
+            || self.retry_e_send
+    }
+}
+
+fn push_invoice_triggers(query: &mut Vec<(String, String)>, triggers: &InvoiceTriggerArgs) {
+    push_bool_query(query, "send_email", triggers.send_email);
+    push_bool_query(query, "mark_sent", triggers.mark_sent);
+    push_bool_query(query, "paid", triggers.paid);
+    if let Some(amount_paid) = &triggers.amount_paid {
+        query.push(("amount_paid".to_string(), amount_paid.clone()));
+    }
+    push_bool_query(query, "cancel", triggers.cancel);
+    push_bool_query(query, "save_default_footer", triggers.save_default_footer);
+    push_bool_query(query, "save_default_terms", triggers.save_default_terms);
+    push_bool_query(query, "retry_e_send", triggers.retry_e_send);
+}
+
+fn push_bool_query(query: &mut Vec<(String, String)>, key: &str, enabled: bool) {
+    if enabled {
+        query.push((key.to_string(), "true".to_string()));
+    }
+}
+
+fn render_dry_run(
+    method: &str,
+    path: &str,
+    query: &[(String, String)],
+    body: Option<&Value>,
+    files: Option<&[PathBuf]>,
+) -> Result<String> {
+    let value = json!({
+        "dry_run": true,
+        "method": method,
+        "path": path,
+        "query": query.iter().map(|(key, value)| json!({"key": key, "value": value})).collect::<Vec<_>>(),
+        "body": body,
+        "files": files.map(|files| files.iter().map(|file| file.display().to_string()).collect::<Vec<_>>()),
+    });
+    serde_json::to_string_pretty(&value).map_err(|source| KobanError::Decode {
+        message: source.to_string(),
+    })
 }
 
 fn push_include(query: &mut Vec<(String, String)>, include: Vec<String>) {
@@ -1902,6 +2694,207 @@ mod tests {
         assert!(matches!(error, KobanError::File { .. }));
     }
 
+    #[test]
+    fn upload_file_requires_existing_regular_file() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let existing = tempdir.path().join("document.txt");
+        std::fs::write(&existing, b"upload").expect("seed file");
+        ensure_upload_file(&existing).expect("regular files are uploadable");
+
+        let missing = tempdir.path().join("missing.txt");
+        let error = ensure_upload_file(&missing).expect_err("missing file");
+        assert!(matches!(error, KobanError::File { .. }));
+
+        let error = ensure_upload_file(tempdir.path()).expect_err("directory");
+        assert!(matches!(error, KobanError::File { .. }));
+    }
+
+    #[test]
+    fn invoice_payload_reports_missing_and_malformed_sources() {
+        let create_error = invoice_payload(empty_payload_args(), true, false)
+            .expect_err("create requires payload");
+        assert!(matches!(create_error, KobanError::InvalidPayload { .. }));
+        assert!(
+            create_error
+                .to_string()
+                .contains("create requires JSON input")
+        );
+
+        let update_error = invoice_payload(empty_payload_args(), false, false)
+            .expect_err("update requires payload");
+        assert!(
+            update_error
+                .to_string()
+                .contains("update requires JSON input")
+        );
+
+        let trigger_only = invoice_payload(empty_payload_args(), false, true).expect("empty body");
+        assert_eq!(trigger_only, serde_json::json!({}));
+
+        let mut invalid_json = empty_payload_args();
+        invalid_json.data = Some("{not json".to_string());
+        let error = invoice_payload(invalid_json, true, false).expect_err("invalid JSON");
+        assert!(error.to_string().contains("JSON could not be parsed"));
+
+        let mut missing_file = empty_payload_args();
+        missing_file.data_file = Some(PathBuf::from("/tmp/koban-missing-payload.json"));
+        let error = invoice_payload(missing_file, true, false).expect_err("missing file");
+        assert!(error.to_string().contains("could not read"));
+    }
+
+    #[test]
+    fn guided_invoice_payload_handles_all_common_fields_and_line_item_scalars() {
+        let mut args = empty_payload_args();
+        args.client_id = Some("client_1".to_string());
+        args.date = Some("2026-05-28".to_string());
+        args.due_date = Some("2026-06-28".to_string());
+        args.number = Some("INV-1".to_string());
+        args.po_number = Some("PO-1".to_string());
+        args.public_notes = Some("public".to_string());
+        args.private_notes = Some("private".to_string());
+        args.terms = Some("Net 30".to_string());
+        args.footer = Some("footer".to_string());
+        args.project_id = Some("project_1".to_string());
+        args.line_items = vec![
+            "product_key=Consulting,quantity=1,cost=99.5,is_amount_discount=false,optional=null"
+                .to_string(),
+        ];
+
+        let payload = invoice_payload(args, true, false).expect("payload");
+        assert_eq!(payload["client_id"], "client_1");
+        assert_eq!(payload["due_date"], "2026-06-28");
+        assert_eq!(payload["line_items"][0]["quantity"], 1);
+        assert_eq!(payload["line_items"][0]["cost"], 99.5);
+        assert_eq!(payload["line_items"][0]["is_amount_discount"], false);
+        assert!(payload["line_items"][0]["optional"].is_null());
+    }
+
+    #[test]
+    fn line_item_parser_reports_bad_parts() {
+        let error = parse_line_item("not-a-pair").expect_err("missing equals");
+        assert!(error.to_string().contains("must use key=value"));
+
+        let error = parse_line_item("=value").expect_err("empty key");
+        assert!(error.to_string().contains("empty key"));
+    }
+
+    #[test]
+    fn invoice_trigger_helpers_build_query_and_confirm_risky_actions() {
+        let triggers = InvoiceTriggerArgs {
+            send_email: true,
+            mark_sent: true,
+            paid: true,
+            amount_paid: Some("12.50".to_string()),
+            cancel: true,
+            save_default_footer: true,
+            save_default_terms: true,
+            retry_e_send: true,
+        };
+        assert!(triggers.has_any());
+        assert!(triggers.requires_confirmation());
+
+        let mut query = Vec::new();
+        push_invoice_triggers(&mut query, &triggers);
+        assert!(query.contains(&("send_email".to_string(), "true".to_string())));
+        assert!(query.contains(&("amount_paid".to_string(), "12.50".to_string())));
+        assert!(query.contains(&("retry_e_send".to_string(), "true".to_string())));
+
+        let safety = WriteSafetyArgs {
+            dry_run: false,
+            yes: false,
+        };
+        let error = require_confirmation("invoice action", &safety).expect_err("confirmation");
+        assert!(matches!(error, KobanError::ConfirmationRequired { .. }));
+
+        require_confirmation(
+            "invoice action",
+            &WriteSafetyArgs {
+                dry_run: true,
+                yes: false,
+            },
+        )
+        .expect("dry run allowed");
+
+        let invalid = InvoiceTriggerArgs {
+            amount_paid: Some("12.50".to_string()),
+            ..empty_trigger_args()
+        };
+        let error = validate_invoice_triggers(&invalid).expect_err("amount requires paid");
+        assert!(error.to_string().contains("--amount-paid requires --paid"));
+    }
+
+    #[test]
+    fn dry_run_output_includes_body_query_and_files() {
+        let files = vec![PathBuf::from("/tmp/document.pdf")];
+        let output = render_dry_run(
+            "PUT",
+            "api/v1/invoices/invoice_1/upload",
+            &[("include".to_string(), "documents".to_string())],
+            Some(&serde_json::json!({"client_id": "client_1"})),
+            Some(&files),
+        )
+        .expect("dry run");
+        assert!(output.contains("\"method\": \"PUT\""), "got: {output}");
+        assert!(
+            output.contains("\"client_id\": \"client_1\""),
+            "got: {output}"
+        );
+        assert!(output.contains("/tmp/document.pdf"), "got: {output}");
+    }
+
+    #[test]
+    fn path_segment_validation_rejects_route_changing_actions() {
+        validate_path_segment("invoice action", "mark_paid").expect("known safe action");
+        validate_path_segment("invoice action", "clone-to-quote").expect("hyphens allowed");
+
+        for bad in [
+            "",
+            ".",
+            "..",
+            "../clients",
+            "mark/paid",
+            "email?include=client",
+        ] {
+            let error = validate_path_segment("invoice action", bad).expect_err("unsafe action");
+            assert!(
+                error.to_string().contains("safe single path segment"),
+                "got: {error}"
+            );
+        }
+    }
+
+    fn empty_payload_args() -> InvoicePayloadArgs {
+        InvoicePayloadArgs {
+            data: None,
+            data_file: None,
+            stdin: false,
+            client_id: None,
+            date: None,
+            due_date: None,
+            number: None,
+            po_number: None,
+            public_notes: None,
+            private_notes: None,
+            terms: None,
+            footer: None,
+            project_id: None,
+            line_items: Vec::new(),
+        }
+    }
+
+    fn empty_trigger_args() -> InvoiceTriggerArgs {
+        InvoiceTriggerArgs {
+            send_email: false,
+            mark_sent: false,
+            paid: false,
+            amount_paid: None,
+            cancel: false,
+            save_default_footer: false,
+            save_default_terms: false,
+            retry_e_send: false,
+        }
+    }
+
     #[tokio::test]
     async fn execute_handles_non_network_commands_without_configured_endpoint() {
         let config = Config::from_values("http://localhost:1234", "token").expect("config");
@@ -1957,6 +2950,130 @@ mod tests {
         .await
         .expect("execute nightly check with config");
         assert!(output.contains("Nightly build available"), "got: {output}");
+    }
+
+    #[tokio::test]
+    async fn execute_invoice_dry_runs_cover_write_commands_without_network() {
+        let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+        let update = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::Update(
+                    UpdateInvoiceArgs {
+                        id: "invoice_1".to_string(),
+                        payload: {
+                            let mut args = empty_payload_args();
+                            args.public_notes = Some("updated".to_string());
+                            args
+                        },
+                        triggers: InvoiceTriggerArgs {
+                            mark_sent: true,
+                            ..empty_trigger_args()
+                        },
+                        safety: WriteSafetyArgs {
+                            dry_run: true,
+                            yes: false,
+                        },
+                        include: vec!["client".to_string()],
+                    },
+                )))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("update dry run");
+        assert!(update.contains("\"method\": \"PUT\""), "got: {update}");
+        assert!(update.contains("mark_sent"), "got: {update}");
+
+        let bulk = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::Bulk(
+                    BulkArgs {
+                        action: "archive".to_string(),
+                        ids: vec!["one".to_string(), "two".to_string()],
+                        email_type: Some("invoice".to_string()),
+                        safety: WriteSafetyArgs {
+                            dry_run: true,
+                            yes: false,
+                        },
+                        include: Vec::new(),
+                    },
+                )))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("bulk dry run");
+        assert!(bulk.contains("\"action\": \"archive\""), "got: {bulk}");
+
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let upload = tempdir.path().join("upload.txt");
+        std::fs::write(&upload, b"document").expect("upload fixture");
+        let upload_output = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::Upload(
+                    UploadArgs {
+                        id: "invoice_1".to_string(),
+                        files: vec![upload],
+                        safety: WriteSafetyArgs {
+                            dry_run: true,
+                            yes: false,
+                        },
+                        include: Vec::new(),
+                    },
+                )))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("upload dry run");
+        assert!(
+            upload_output.contains("\"method\": \"PUT\""),
+            "got: {upload_output}"
+        );
+
+        let action = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::Action(
+                    InvoiceActionArgs {
+                        id: "invoice_1".to_string(),
+                        action: "mark_paid".to_string(),
+                        safety: WriteSafetyArgs {
+                            dry_run: true,
+                            yes: false,
+                        },
+                        include: Vec::new(),
+                    },
+                )))),
+            },
+            config,
+        )
+        .await
+        .expect("action dry run");
+        assert!(
+            action.contains("api/v1/invoices/invoice_1/mark_paid"),
+            "got: {action}"
+        );
+    }
+
+    #[tokio::test]
+    async fn multipart_upload_reports_missing_file_before_network() {
+        let client = ApiClient::new(
+            Config::from_values("http://localhost:1234", "secret-token").expect("config"),
+        );
+        let error = client
+            .put_multipart(
+                "api/v1/invoices/invoice_1/upload",
+                &[],
+                &[PathBuf::from("/tmp/koban-missing-upload.txt")],
+            )
+            .await
+            .expect_err("missing upload");
+        assert!(matches!(error, KobanError::File { .. }));
     }
 
     #[tokio::test]
@@ -2041,10 +3158,12 @@ mod tests {
         let output = execute_with_config(
             Cli {
                 output: OutputFormat::Table,
-                command: Some(Commands::Invoices(InvoiceCommand::Show(ShowArgs {
-                    id: "invoice_1".to_string(),
-                    include: Vec::new(),
-                }))),
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::Show(
+                    ShowArgs {
+                        id: "invoice_1".to_string(),
+                        include: Vec::new(),
+                    },
+                )))),
             },
             config.clone(),
         )
@@ -2055,15 +3174,17 @@ mod tests {
         let output = execute_with_config(
             Cli {
                 output: OutputFormat::Table,
-                command: Some(Commands::Invoices(InvoiceCommand::List(ListArgs {
-                    page: 1,
-                    per_page: 10,
-                    include: Vec::new(),
-                    filters: Vec::new(),
-                    sort: None,
-                    all: false,
-                    limit: None,
-                }))),
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::List(
+                    ListArgs {
+                        page: 1,
+                        per_page: 10,
+                        include: Vec::new(),
+                        filters: Vec::new(),
+                        sort: None,
+                        all: false,
+                        limit: None,
+                    },
+                )))),
             },
             config.clone(),
         )
@@ -2074,9 +3195,11 @@ mod tests {
         let output = execute_with_config(
             Cli {
                 output: OutputFormat::Json,
-                command: Some(Commands::Invoices(InvoiceCommand::Template(TemplateArgs {
-                    include: Vec::new(),
-                }))),
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::Template(
+                    TemplateArgs {
+                        include: Vec::new(),
+                    },
+                )))),
             },
             config.clone(),
         )
@@ -2119,10 +3242,12 @@ mod tests {
         let output = execute_with_config(
             Cli {
                 output: OutputFormat::Json,
-                command: Some(Commands::Invoices(InvoiceCommand::EditTemplate(ShowArgs {
-                    id: "invoice_1".to_string(),
-                    include: vec!["client".to_string()],
-                }))),
+                command: Some(Commands::Invoices(Box::new(InvoiceCommand::EditTemplate(
+                    ShowArgs {
+                        id: "invoice_1".to_string(),
+                        include: vec!["client".to_string()],
+                    },
+                )))),
             },
             config,
         )

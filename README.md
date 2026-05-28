@@ -7,7 +7,8 @@ shell completions.
 
 The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
 still early work: the CLI boots, reports its version, generates shell
-completions, and exposes a growing read-only Invoice Ninja API surface.
+completions, exposes a growing Invoice Ninja API surface, and now includes
+guarded invoice write commands.
 
 ## Install
 
@@ -48,7 +49,8 @@ koban completions fish
 koban completions nushell
 ```
 
-The implemented API commands are read-only and use `GET` requests only:
+The implemented API commands cover read workflows across core resources and
+guarded invoice write workflows:
 
 ```sh
 koban statics --output json
@@ -61,6 +63,15 @@ koban invoices list --filter status_id=gt:1 --sort 'date|desc' --all --limit 50
 koban invoices show <id>
 koban invoices template --output json
 koban invoices edit-template <id> --output json
+koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
+koban invoices create --data-file invoice.json --include client
+koban invoices update <id> --data-file invoice.json --dry-run
+koban invoices update <id> --public-notes "Thanks again" --mark-sent
+koban invoices delete <id> --dry-run
+koban invoices delete <id> --yes
+koban invoices bulk --action archive --id <id> --id <id> --dry-run
+koban invoices action <id> --action mark_paid --dry-run
+koban invoices upload <id> --file contract.pdf --dry-run
 koban invoices download <invitation_key> --output-file invoice.pdf
 koban invoices delivery-note <id> --output-file delivery-note.pdf
 koban payments list
@@ -99,7 +110,7 @@ Invoice Ninja v5 exposes an API under `/api/v1`. Hosted production is
 `https://invoicing.co`, and self-hosted installs use the same namespace under
 their own base URL. Invoice Ninja also provides a public demo API at
 `https://demo.invoiceninja.com` with the demo token `TOKEN`; use that target for
-read-only live smoke tests whenever possible.
+live smoke tests whenever possible.
 
 Authentication is token based. Requests require `X-API-TOKEN`, and the developer
 guide also documents `X-Requested-With: XMLHttpRequest` as a required security
@@ -117,6 +128,14 @@ koban invoices list
 koban invoices show <id>
 koban invoices template
 koban invoices edit-template <id>
+koban invoices create
+koban invoices update <id>
+koban invoices delete <id>
+koban invoices bulk
+koban invoices action <id>
+koban invoices upload <id>
+koban invoices download <invitation_key>
+koban invoices delivery-note <id>
 koban payments list
 koban payments show <id>
 koban payments template
@@ -161,8 +180,20 @@ koban invoices list --all --limit 100 --output json
 Invoice download commands also use read-only `GET` routes and write PDF bytes to
 explicit file paths. Existing files are not overwritten unless `--force` is set.
 
-Future creation and update commands should grow around explicit files or
-stdin-first JSON so agent workflows do not depend on prompts.
+Invoice write commands accept either one raw JSON source or guided flags:
+
+```sh
+koban invoices create --data '{"client_id":"...","line_items":[]}' --dry-run
+koban invoices create --data-file invoice.json --include client
+printf '%s' '{"public_notes":"Updated"}' | koban invoices update <id> --stdin
+koban invoices create --client-id <client_id> \
+  --line-item product_key=Consulting,quantity=1,cost=100 \
+  --dry-run
+```
+
+Risky mutations require `--yes` unless `--dry-run` is used. This includes
+invoice deletion, bulk actions, uploads, custom actions, sending email, paid
+state changes, cancellation, and retrying e-send.
 
 ## Configuration Plan
 
@@ -177,7 +208,7 @@ export INVOICE_NINJA_API_TOKEN="..."
 Tokens must never be printed by default, and human-facing output should have a
 matching JSON mode before it ships.
 
-For demo-only read smoke tests:
+For demo smoke tests:
 
 ```sh
 export INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
@@ -186,12 +217,12 @@ export INVOICE_NINJA_API_TOKEN="TOKEN"
 
 ## Safety
 
-Current commands issue only `GET` requests. Read-only live smoke tests should use
-the public demo endpoint above by default. Do not smoke test write, bulk, upload,
-import, email, purge, refund, merge, archive, or delete endpoints against any
-environment unless write support has been explicitly implemented and reviewed.
-Production or personal accounts should only be used for intentional,
-non-destructive reads.
+Read-only live smoke tests should use the public demo endpoint above by default.
+Invoice write support is implemented with `--dry-run` and `--yes` guardrails, but
+live write smoke tests must be explicit and should target the public demo API.
+Do not smoke test unimplemented write families such as client/payment writes,
+imports, purges, refunds, merges, or scheduler endpoints against any environment.
+Production or personal accounts should only be used for intentional checks.
 
 ## Development
 
@@ -230,6 +261,8 @@ coverage        cargo llvm-cov summary, or --html for a report
 koban           cargo run -- ...
 koban-help      show koban help
 smoke-statics   safe live GET /api/v1/statics smoke test
+smoke-invoice-write-demo  explicit demo-only invoice create/update/delete smoke test
+smoke-all-demo  explicit demo-only smoke test for every implemented command family
 ```
 
 The devshell also loads `INVOICE_NINJA_API_TOKEN` and
@@ -240,6 +273,13 @@ the demo values:
 ```dotenv
 INVOICE_NINJA_API_TOKEN=TOKEN
 INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com
+```
+
+The demo invoice write smoke helper is intentionally opt-in:
+
+```sh
+KOBAN_LIVE_WRITE_SMOKE=1 smoke-invoice-write-demo
+KOBAN_LIVE_WRITE_SMOKE=1 smoke-all-demo
 ```
 
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
