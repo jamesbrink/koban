@@ -428,7 +428,7 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
 }
 
 #[tokio::test]
-async fn generic_resource_create_update_require_confirmation_without_dry_run() {
+async fn generic_resource_and_endpoint_writes_require_confirmation_without_dry_run() {
     let config = Config::from_values("http://localhost:1234", "token").expect("config");
 
     let create_error = execute_with_config(
@@ -477,12 +477,39 @@ async fn generic_resource_create_update_require_confirmation_without_dry_run() {
                 },
             ))),
         },
-        config,
+        config.clone(),
     )
     .await
     .expect_err("webhook update should require confirmation");
     assert!(matches!(
         update_error,
+        KobanError::ConfirmationRequired { .. }
+    ));
+
+    let endpoint_error = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Charts(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: Some(HttpMethod::Put),
+                payload: {
+                    let mut args = empty_resource_payload_args();
+                    args.fields.push("name=revenue".to_string());
+                    args
+                },
+                safety: WriteSafetyArgs {
+                    dry_run: false,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect_err("endpoint put should require confirmation");
+    assert!(matches!(
+        endpoint_error,
         KobanError::ConfirmationRequired { .. }
     ));
 }
@@ -628,7 +655,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
                 payload: empty_resource_payload_args(),
                 safety: WriteSafetyArgs {
                     dry_run: false,
-                    yes: false,
+                    yes: true,
                 },
                 include: Vec::new(),
             }))),
@@ -651,7 +678,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
                 },
                 safety: WriteSafetyArgs {
                     dry_run: false,
-                    yes: false,
+                    yes: true,
                 },
                 include: Vec::new(),
             }))),

@@ -485,14 +485,16 @@ async fn execute_endpoint_run(
         );
     }
 
+    if !matches!(method, HttpMethod::Get) {
+        let action = format!("endpoint {}", method.label().to_ascii_lowercase());
+        require_confirmation(&action, &args.safety)?;
+    }
+
     let json = match method {
         HttpMethod::Get => client.get_json(&path, &query).await?,
         HttpMethod::Post => client.post_json(&path, &query, &body).await?,
         HttpMethod::Put => client.put_json(&path, &query, &body).await?,
-        HttpMethod::Delete => {
-            require_confirmation("endpoint delete", &args.safety)?;
-            client.delete_json(&path, &query).await?
-        }
+        HttpMethod::Delete => client.delete_json(&path, &query).await?,
     };
     render_value(output, None, &json)
 }

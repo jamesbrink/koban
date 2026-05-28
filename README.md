@@ -188,10 +188,11 @@ koban clients create --field name=Acme --field contacts.email=ap@example.test --
 ```
 
 Generic resource create/update/delete/bulk/upload/action commands require
-`--yes` unless `--dry-run` is used. Invoice create/update keep their lighter
-workflow for ordinary draft edits, but require `--yes` when they send email,
-mark paid, cancel, retry e-send, or otherwise cause externally visible state
-changes.
+`--yes` unless `--dry-run` is used. Generic endpoint runners also require
+`--yes` for non-GET methods unless they are dry runs. Invoice create/update keep
+their lighter workflow for ordinary draft edits, but require `--yes` when they
+send email, mark paid, cancel, retry e-send, or otherwise cause externally
+visible state changes.
 
 ## Configuration Plan
 

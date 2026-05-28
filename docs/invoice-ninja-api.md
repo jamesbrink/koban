@@ -223,6 +223,8 @@ Safety rules:
 - Every write supports `--dry-run`.
 - Generic resource `create`, `update`, `delete`, `bulk`, `upload`, and `action`
   commands require `--yes` unless `--dry-run` is used.
+- Generic endpoint runners require `--yes` for non-GET methods unless
+  `--dry-run` is used.
 - `create` and `update` require `--yes` when they send email, mark paid, record
   an amount paid, cancel, or retry e-send on invoice-specific commands.
 - Mocked tests are required for every write path. Live write smoke tests must be
