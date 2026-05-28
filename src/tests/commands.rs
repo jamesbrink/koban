@@ -268,7 +268,7 @@ async fn expanded_resource_and_endpoint_dry_runs_do_not_touch_network() {
             output: OutputFormat::Json,
             command: Some(Commands::Search(EndpointCommand::Run(EndpointArgs {
                 endpoint: None,
-                method: HttpMethod::Post,
+                method: Some(HttpMethod::Post),
                 payload: {
                     let mut args = empty_resource_payload_args();
                     args.fields.push("query=acme".to_string());
@@ -428,6 +428,94 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
 }
 
 #[tokio::test]
+async fn generic_resource_create_update_require_confirmation_without_dry_run() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    let create_error = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Tokens(ResourceCommand::Create(
+                ResourceWriteArgs {
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.name = Some("automation".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: false,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect_err("token create should require confirmation");
+    assert!(matches!(
+        create_error,
+        KobanError::ConfirmationRequired { .. }
+    ));
+
+    let update_error = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Webhooks(ResourceCommand::Update(
+                UpdateResourceArgs {
+                    id: "webhook_1".to_string(),
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.name = Some("webhook".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: false,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config,
+    )
+    .await
+    .expect_err("webhook update should require confirmation");
+    assert!(matches!(
+        update_error,
+        KobanError::ConfirmationRequired { .. }
+    ));
+}
+
+#[tokio::test]
+async fn utility_defaults_to_safe_ping_get() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+    let output = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: None,
+                payload: empty_resource_payload_args(),
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect("utility ping dry run");
+    assert!(output.contains("\"method\": \"GET\""), "got: {output}");
+    assert!(
+        output.contains("\"path\": \"api/v1/ping\""),
+        "got: {output}"
+    );
+}
+
+#[tokio::test]
 async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
     let server = MockServer::start();
     let config = Config::from_values(server.base_url(), "token").expect("config");
@@ -477,7 +565,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
                     },
                     safety: WriteSafetyArgs {
                         dry_run: false,
-                        yes: false,
+                        yes: true,
                     },
                     include: Vec::new(),
                 },
@@ -501,7 +589,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
                     },
                     safety: WriteSafetyArgs {
                         dry_run: false,
-                        yes: false,
+                        yes: true,
                     },
                     include: Vec::new(),
                 },
@@ -536,7 +624,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
             output: OutputFormat::Json,
             command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
                 endpoint: None,
-                method: HttpMethod::Get,
+                method: Some(HttpMethod::Get),
                 payload: empty_resource_payload_args(),
                 safety: WriteSafetyArgs {
                     dry_run: false,
@@ -555,7 +643,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
             output: OutputFormat::Json,
             command: Some(Commands::Charts(EndpointCommand::Run(EndpointArgs {
                 endpoint: None,
-                method: HttpMethod::Put,
+                method: Some(HttpMethod::Put),
                 payload: {
                     let mut args = empty_resource_payload_args();
                     args.fields.push("name=revenue".to_string());
@@ -578,7 +666,7 @@ async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
             output: OutputFormat::Json,
             command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
                 endpoint: Some("support/ticket_1".to_string()),
-                method: HttpMethod::Delete,
+                method: Some(HttpMethod::Delete),
                 payload: empty_resource_payload_args(),
                 safety: WriteSafetyArgs {
                     dry_run: false,

@@ -132,8 +132,7 @@ fn dynamic_expanded_resource_completions_include_write_commands() {
         .stdout(predicate::str::contains("delete"))
         .stdout(predicate::str::contains("bulk"))
         .stdout(predicate::str::contains("upload"))
-        .stdout(predicate::str::contains("action"))
-        .stdout(predicate::str::contains("download"));
+        .stdout(predicate::str::contains("action"));
 }
 
 #[test]

@@ -348,9 +348,6 @@ Examples:
 
     /// Run a custom resource action
     Action(ResourceActionArgs),
-
-    /// Download a resource document by hashed ID
-    Download(DownloadArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -633,8 +630,8 @@ pub struct EndpointArgs {
     pub endpoint: Option<String>,
 
     /// HTTP method to use
-    #[arg(long, value_enum, default_value_t = HttpMethod::Post)]
-    pub method: HttpMethod,
+    #[arg(long, value_enum)]
+    pub method: Option<HttpMethod>,
 
     #[command(flatten)]
     pub payload: ResourcePayloadArgs,

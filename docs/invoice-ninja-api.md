@@ -147,7 +147,6 @@ koban <resource> delete <id>
 koban <resource> bulk
 koban <resource> upload <id>
 koban <resource> action <id>
-koban <resource> download <id>
 ```
 
 The resource set includes `clients`, `invoices`, `payments`, `quotes`,
@@ -222,15 +221,16 @@ the live-compatible method for invoices and `POST` for generic resource uploads.
 Safety rules:
 
 - Every write supports `--dry-run`.
-- `delete`, `bulk`, `upload`, and `action` require `--yes` unless `--dry-run` is
-  used.
+- Generic resource `create`, `update`, `delete`, `bulk`, `upload`, and `action`
+  commands require `--yes` unless `--dry-run` is used.
 - `create` and `update` require `--yes` when they send email, mark paid, record
-  an amount paid, cancel, or retry e-send.
+  an amount paid, cancel, or retry e-send on invoice-specific commands.
 - Mocked tests are required for every write path. Live write smoke tests must be
   explicitly opted in and should use the public demo endpoint.
 - `smoke-all-demo` is the repeatable full live smoke helper for the implemented
-  command families. It only runs when `KOBAN_LIVE_WRITE_SMOKE=1` and the
-  environment is set to the public demo URL with token `TOKEN`.
+  command families. It hard-codes the public demo URL and token internally,
+  live-reads every supported demo resource, dry-runs every expanded resource
+  write family, and only runs when `KOBAN_LIVE_WRITE_SMOKE=1`.
 
 ## High-Risk Endpoints
 
@@ -267,7 +267,7 @@ The current implementation is a guarded API foundation:
 3. `koban statics` uses `GET /api/v1/statics` as the smallest authenticated
    smoke test, preferably against the public demo endpoint.
 4. Resource `list/show/template/edit-template/create/update/delete/bulk/upload/
-   action/download` commands across the documented resource families.
+   action` commands across the documented resource families.
 5. List pagination with `--page`, `--per-page`, `--all`, and `--limit`.
 6. Raw filtering and sorting with `--filter key=value` and `--sort field|dir`.
 7. Read-only invoice PDF downloads for invoice PDFs and delivery notes.
@@ -320,7 +320,6 @@ koban payments template --output json
 koban payments edit-template <payment_id> --output json
 koban products create --name Consulting --price 100 --dry-run
 koban products update <product_id> --field notes="Hourly support" --dry-run
-koban purchase-orders download <purchase_order_id> --output-file purchase-order.pdf
 koban recurring-invoices action <recurring_invoice_id> --action start --dry-run
 koban search run --field query=acme --dry-run
 koban reports run --endpoint reports --data-file report.json --dry-run

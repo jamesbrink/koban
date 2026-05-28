@@ -6,7 +6,7 @@ use std::{
 
 use serde_json::Value;
 
-use crate::{KobanError, Result};
+use crate::{KobanError, Result, cli::ResourcePayloadArgs};
 
 #[derive(Debug, Clone, Default)]
 pub struct GenericPayloadArgs {
@@ -55,6 +55,54 @@ pub(crate) fn generic_payload(args: GenericPayloadArgs, require_payload: bool) -
         })
     } else {
         Ok(Value::Object(serde_json::Map::new()))
+    }
+}
+
+pub(crate) fn resource_payload(args: ResourcePayloadArgs, require_payload: bool) -> Result<Value> {
+    let mut fields = args.fields;
+    push_optional_field(&mut fields, "name", args.name);
+    push_optional_field(&mut fields, "number", args.number);
+    push_optional_field(&mut fields, "client_id", args.client_id);
+    push_optional_field(&mut fields, "vendor_id", args.vendor_id);
+    push_optional_field(&mut fields, "project_id", args.project_id);
+    push_optional_field(&mut fields, "date", args.date);
+    push_optional_field(&mut fields, "due_date", args.due_date);
+    push_optional_field(&mut fields, "amount", args.amount);
+    push_optional_field(&mut fields, "price", args.price);
+    push_optional_field(&mut fields, "quantity", args.quantity);
+    push_optional_field(&mut fields, "public_notes", args.public_notes);
+    push_optional_field(&mut fields, "private_notes", args.private_notes);
+
+    let mut body = generic_payload(
+        GenericPayloadArgs {
+            data: args.data,
+            data_file: args.data_file,
+            stdin: args.stdin,
+            fields,
+        },
+        require_payload && args.line_items.is_empty(),
+    )?;
+
+    if !args.line_items.is_empty() {
+        let Some(map) = body.as_object_mut() else {
+            return Err(KobanError::InvalidPayload {
+                message: "payload must be a JSON object".to_string(),
+            });
+        };
+        let line_items = args
+            .line_items
+            .into_iter()
+            .map(|line_item| crate::invoice::parse_line_item(&line_item))
+            .collect::<Result<Vec<_>>>()?;
+        map.insert("line_items".to_string(), Value::Array(line_items));
+    }
+
+    Ok(body)
+}
+
+fn push_optional_field(fields: &mut Vec<String>, key: &str, value: Option<String>) {
+    if let Some(value) = value {
+        fields.push(format!("{key}={value}"));
     }
 }
 

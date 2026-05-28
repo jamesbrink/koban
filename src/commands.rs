@@ -8,13 +8,13 @@ use crate::{
     cli::{
         BulkArgs, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod, InvoiceActionArgs,
         InvoiceCommand, InvoiceWriteArgs, ListArgs, ResourceActionArgs, ResourceCommand,
-        ResourcePayloadArgs, ResourceWriteArgs, UpdateInvoiceArgs, UpdateResourceArgs, UploadArgs,
+        ResourceWriteArgs, UpdateInvoiceArgs, UpdateResourceArgs, UploadArgs,
     },
     invoice::{
         invoice_payload, push_invoice_triggers, render_dry_run, require_confirmation,
         validate_invoice_triggers, validate_path_segment,
     },
-    payload::{GenericPayloadArgs, generic_payload},
+    payload::resource_payload,
     render::{render_value, response_rows},
     resource::Resource,
     update,
@@ -229,15 +229,6 @@ async fn execute_resource(
         ResourceCommand::Action(args) => {
             execute_resource_action(client, output, resource, args).await
         }
-        ResourceCommand::Download(args) => {
-            execute_download(
-                client,
-                &format!("api/v1/{}", resource.path()),
-                "download",
-                args,
-            )
-            .await
-        }
     }
 }
 
@@ -251,6 +242,8 @@ async fn execute_resource_create(
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     let path = format!("api/v1/{}", resource.path());
+
+    require_confirmation(&format!("{} create", resource.label()), &args.safety)?;
 
     if args.safety.dry_run {
         return render_dry_run("POST", &path, &query, Some(&body), None);
@@ -270,6 +263,8 @@ async fn execute_resource_update(
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     let path = format!("api/v1/{}/{}", resource.path(), args.id);
+
+    require_confirmation(&format!("{} update", resource.label()), &args.safety)?;
 
     if args.safety.dry_run {
         return render_dry_run("PUT", &path, &query, Some(&body), None);
@@ -468,10 +463,13 @@ async fn execute_endpoint_run(
         .endpoint
         .unwrap_or_else(|| default_endpoint.to_string());
     validate_endpoint_path(&endpoint)?;
+    let method = args
+        .method
+        .unwrap_or_else(|| default_method(default_endpoint));
     let path = format!("api/v1/{endpoint}");
     let body = resource_payload(
         args.payload,
-        matches!(args.method, HttpMethod::Post | HttpMethod::Put),
+        matches!(method, HttpMethod::Post | HttpMethod::Put),
     )?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
@@ -479,7 +477,7 @@ async fn execute_endpoint_run(
 
     if args.safety.dry_run {
         return render_dry_run(
-            args.method.label(),
+            method.label(),
             &path,
             &query,
             has_body.then_some(&body),
@@ -487,7 +485,7 @@ async fn execute_endpoint_run(
         );
     }
 
-    let json = match args.method {
+    let json = match method {
         HttpMethod::Get => client.get_json(&path, &query).await?,
         HttpMethod::Post => client.post_json(&path, &query, &body).await?,
         HttpMethod::Put => client.put_json(&path, &query, &body).await?,
@@ -499,51 +497,11 @@ async fn execute_endpoint_run(
     render_value(output, None, &json)
 }
 
-fn resource_payload(args: ResourcePayloadArgs, require_payload: bool) -> Result<Value> {
-    let mut fields = args.fields;
-    push_optional_field(&mut fields, "name", args.name);
-    push_optional_field(&mut fields, "number", args.number);
-    push_optional_field(&mut fields, "client_id", args.client_id);
-    push_optional_field(&mut fields, "vendor_id", args.vendor_id);
-    push_optional_field(&mut fields, "project_id", args.project_id);
-    push_optional_field(&mut fields, "date", args.date);
-    push_optional_field(&mut fields, "due_date", args.due_date);
-    push_optional_field(&mut fields, "amount", args.amount);
-    push_optional_field(&mut fields, "price", args.price);
-    push_optional_field(&mut fields, "quantity", args.quantity);
-    push_optional_field(&mut fields, "public_notes", args.public_notes);
-    push_optional_field(&mut fields, "private_notes", args.private_notes);
-
-    let mut body = generic_payload(
-        GenericPayloadArgs {
-            data: args.data,
-            data_file: args.data_file,
-            stdin: args.stdin,
-            fields,
-        },
-        require_payload && args.line_items.is_empty(),
-    )?;
-
-    if !args.line_items.is_empty() {
-        let Some(map) = body.as_object_mut() else {
-            return Err(KobanError::InvalidPayload {
-                message: "payload must be a JSON object".to_string(),
-            });
-        };
-        let line_items = args
-            .line_items
-            .into_iter()
-            .map(|line_item| crate::invoice::parse_line_item(&line_item))
-            .collect::<Result<Vec<_>>>()?;
-        map.insert("line_items".to_string(), Value::Array(line_items));
-    }
-
-    Ok(body)
-}
-
-fn push_optional_field(fields: &mut Vec<String>, key: &str, value: Option<String>) {
-    if let Some(value) = value {
-        fields.push(format!("{key}={value}"));
+fn default_method(default_endpoint: &str) -> HttpMethod {
+    if default_endpoint == "ping" {
+        HttpMethod::Get
+    } else {
+        HttpMethod::Post
     }
 }
 

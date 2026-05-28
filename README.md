@@ -50,8 +50,9 @@ koban completions nushell
 ```
 
 The implemented API commands cover read workflows, guided/JSON writes,
-bulk/custom actions, uploads, and downloads across Invoice Ninja resource
-families:
+bulk/custom actions, and uploads across Invoice Ninja resource families.
+Invoice-specific PDF downloads remain first-class because their route shape is
+documented and invitation-key based:
 
 ```sh
 koban statics --output json
@@ -106,7 +107,6 @@ koban tasks edit-template <id> --output json
 koban products create --name Consulting --price 100 --dry-run
 koban products update <id> --field notes="Hourly support" --dry-run
 koban products delete <id> --dry-run
-koban purchase-orders download <id> --output-file purchase-order.pdf
 koban recurring-invoices action <id> --action start --dry-run
 koban search run --field query=acme --dry-run
 koban reports run --endpoint reports --data-file report.json --dry-run
@@ -139,7 +139,6 @@ koban <resource> delete <id>
 koban <resource> bulk
 koban <resource> action <id>
 koban <resource> upload <id>
-koban <resource> download <id>
 koban invoices download <invitation_key>
 koban invoices delivery-note <id>
 koban search run
@@ -188,9 +187,11 @@ koban products create --name Consulting --price 100 --dry-run
 koban clients create --field name=Acme --field contacts.email=ap@example.test --dry-run
 ```
 
-Risky mutations require `--yes` unless `--dry-run` is used. This includes
-deletion, bulk actions, uploads, custom actions, sending email, paid state
-changes, cancellation, retrying e-send, and utility endpoints that delete data.
+Generic resource create/update/delete/bulk/upload/action commands require
+`--yes` unless `--dry-run` is used. Invoice create/update keep their lighter
+workflow for ordinary draft edits, but require `--yes` when they send email,
+mark paid, cancel, retry e-send, or otherwise cause externally visible state
+changes.
 
 ## Configuration Plan
 
@@ -281,6 +282,11 @@ demo API internally so they cannot inherit a production or personal endpoint:
 KOBAN_LIVE_WRITE_SMOKE=1 smoke-invoice-write-demo
 KOBAN_LIVE_WRITE_SMOKE=1 smoke-all-demo
 ```
+
+`smoke-all-demo` live-reads every resource that the public demo API exposes,
+allows documented demo-only 404s for unsupported reference pages, dry-runs every
+expanded resource write family, and performs a create/update/upload/action/
+download/bulk/delete invoice lifecycle with cleanup.
 
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on
