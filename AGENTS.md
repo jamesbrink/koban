@@ -3,8 +3,12 @@
 Always use conventional commits and proper branch names like `fix/*`, `feat/*`,
 and `chore/*`.
 
+The `main` branch is protected. Use pull requests for changes and keep the
+required CI contexts green: `fmt`, `check`, `clippy`, `test`, and `build`.
+Resolve review conversations before merging.
+
 Koban is an early Rust CLI for Invoice Ninja. Keep the current implemented API
-surface read-only unless James explicitly asks for write support:
+surface read-only unless explicitly requested for write support:
 
 - Use only `GET` requests in CLI commands.
 - Do not smoke test destructive, write, bulk, upload, import, email, purge,
@@ -22,7 +26,18 @@ helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `coverage`, `koban`, `koban-help`, and `smoke-statics`.
 
 Release automation lives in `.github/workflows/release-please.yml`. Koban is a
-plain CLI: do not add code signing or notarization unless James explicitly asks.
+plain CLI: do not add code signing or notarization unless explicitly requested.
 Release assets must stay in sync with `koban update` asset names and
-`SHA256SUMS`, and crates.io publishing must remain gated on
-`CARGO_REGISTRY_TOKEN`.
+`install.sh`, and each release must publish `SHA256SUMS`. crates.io publishing
+must remain gated on `CARGO_REGISTRY_TOKEN`.
+
+`install.sh` is the supported `curl | sh` installer. Keep its asset matrix,
+checksum handling, and environment variables (`KOBAN_INSTALL_DIR`,
+`KOBAN_VERSION`) in sync with README.md and release assets.
+
+AGENTS.md is the single source of truth for agent instructions. `CLAUDE.md`
+must remain a symlink to `AGENTS.md`, not a separate copy.
+
+Copilot repository instructions live in `.github/copilot-instructions.md`, with
+path-specific frontmatter instructions in `.github/instructions/*.instructions.md`.
+Keep them short and consistent with this file.

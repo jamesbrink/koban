@@ -9,6 +9,33 @@ The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
 still early work: the CLI boots, reports its version, generates shell
 completions, and exposes a small read-only Invoice Ninja API surface.
 
+## Install
+
+For direct binary installs on macOS and Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | sh
+```
+
+Installer options:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | \
+  KOBAN_VERSION="v0.1.0" KOBAN_INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+The installer downloads GitHub release tarballs, verifies `SHA256SUMS` when
+available, installs `koban` into `~/.local/bin` by default, and prints the
+installed version. It uses the same macOS/Linux asset names as release CI and
+`koban update`.
+
+Other install paths:
+
+```sh
+cargo install koban
+nix run github:jamesbrink/koban -- --help
+```
+
 ## Current CLI
 
 ```sh
@@ -141,6 +168,14 @@ both x86_64 and aarch64.
 Releases are managed by release-please. When a release is cut, CI builds
 unsigned CLI tarballs for macOS and Linux, uploads `SHA256SUMS`, and publishes
 the crate to crates.io using `CARGO_REGISTRY_TOKEN`.
+
+The `install.sh` script is the supported `curl | sh` path for direct installs:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_VERSION=v0.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_INSTALL_DIR=/usr/local/bin sh
+```
 
 `koban update` downloads those GitHub release tarballs and verifies checksums
 for direct installs. Package-manager installs are left alone and get an upgrade
