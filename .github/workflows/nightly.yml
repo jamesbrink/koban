@@ -37,6 +37,8 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: dtolnay/rust-toolchain@stable
+
       - id: version
         run: |
           set -euo pipefail
