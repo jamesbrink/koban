@@ -1,0 +1,18 @@
+[package]
+name = "koban"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+authors = ["James Brink <brink.james@gmail.com>"]
+description = "A Rust CLI for Invoice Ninja, built for humans and AI agents"
+homepage = "https://github.com/jamesbrink/koban"
+documentation = "https://docs.rs/koban"
+repository = "https://github.com/jamesbrink/koban"
+readme = "README.md"
+keywords = ["invoice-ninja", "invoice", "cli", "agents", "api"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+clap_complete = { version = "4", features = ["unstable-dynamic"] }
