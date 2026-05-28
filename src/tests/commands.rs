@@ -559,7 +559,7 @@ async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
             Cli {
                 output: OutputFormat::Json,
                 command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
-                    endpoint: Some("preview".to_string()),
+                    endpoint: None,
                     method: Some(method),
                     payload: {
                         let mut args = empty_resource_payload_args();
@@ -608,6 +608,31 @@ async fn utility_rejects_write_methods() {
         assert!(matches!(error, KobanError::InvalidPayload { .. }));
         assert!(error.to_string().contains("read-only"), "got: {error}");
     }
+}
+
+#[tokio::test]
+async fn endpoint_overrides_reject_write_methods() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+    let error = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
+                endpoint: Some("clients/client_1/purge".to_string()),
+                method: Some(HttpMethod::Post),
+                payload: empty_resource_payload_args(),
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect_err("custom endpoint writes should be rejected");
+    assert!(matches!(error, KobanError::InvalidPayload { .. }));
+    assert!(error.to_string().contains("read-only"), "got: {error}");
 }
 
 #[tokio::test]

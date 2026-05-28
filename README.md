@@ -153,8 +153,8 @@ koban charts run
 koban utility run
 ```
 
-`utility run` is read-only and only sends `GET` requests. Use first-class
-resource commands for mutations.
+Custom endpoint overrides are read-only and only send `GET` requests. Use
+first-class resource commands for mutations.
 
 `<resource>` includes `clients`, `invoices`, `payments`, `quotes`, `credits`,
 `vendors`, `expenses`, `projects`, `tasks`, `locations`, `products`,
@@ -202,8 +202,9 @@ koban clients create --field name=Acme --field contacts.email=ap@example.test --
 ```
 
 Generic resource create/update/delete/bulk/upload/action commands require
-`--yes` unless `--dry-run` is used. Generic endpoint runners also require
-`--yes` for non-GET methods unless they are dry runs. Invoice create/update keep
+`--yes` unless `--dry-run` is used. Generic endpoint runner defaults may use
+non-GET methods with `--yes`, but custom `--endpoint` overrides are GET-only.
+Invoice create/update keep
 their lighter workflow for ordinary draft edits, but require `--yes` when they
 mark sent, send email, mark paid, cancel, save default footer/terms, retry
 e-send, or otherwise cause externally visible state changes.

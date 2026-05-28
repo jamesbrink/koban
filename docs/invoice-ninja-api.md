@@ -177,8 +177,8 @@ koban utility run
 ```
 
 `search`, `reports`, and `charts` default to their matching endpoint names.
-`utility run` defaults to `ping`, accepts `--endpoint` for other utility paths,
-and is read-only: it only sends `GET` requests.
+Custom `--endpoint` overrides are read-only and only send `GET` requests.
+`utility run` defaults to `ping` and is always read-only.
 
 ## Implemented Write Endpoints
 
@@ -229,8 +229,8 @@ Safety rules:
 - Every write supports `--dry-run`.
 - Generic resource `create`, `update`, `delete`, `bulk`, `upload`, and `action`
   commands require `--yes` unless `--dry-run` is used.
-- Generic endpoint runners require `--yes` for non-GET methods unless
-  `--dry-run` is used.
+- Generic endpoint runner defaults require `--yes` for non-GET methods unless
+  `--dry-run` is used. Custom `--endpoint` overrides are read-only.
 - `utility run` is read-only and rejects non-GET methods.
 - Generic endpoint runner payload flags are valid only with `POST` and `PUT`;
   `GET` and `DELETE` reject payloads instead of silently dropping request
