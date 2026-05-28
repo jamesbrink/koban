@@ -502,9 +502,18 @@ async fn execute_endpoint_run(
         args.payload,
         matches!(method, HttpMethod::Post | HttpMethod::Put),
     )?;
+    let has_body = body.as_object().is_some_and(|body| !body.is_empty());
+    if has_body && matches!(method, HttpMethod::Get | HttpMethod::Delete) {
+        return Err(KobanError::InvalidPayload {
+            message: format!(
+                "{} endpoint commands do not send request bodies; use --method post or --method put for payload fields",
+                method.label()
+            ),
+        });
+    }
+
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-    let has_body = body.as_object().is_some_and(|body| !body.is_empty());
 
     if args.safety.dry_run {
         return render_dry_run(

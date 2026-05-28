@@ -114,6 +114,9 @@ koban reports run --endpoint reports --data-file report.json --dry-run
 
 Recurring invoice single-record actions are sent through Invoice Ninja's bulk
 action endpoint with a one-item `ids` list, matching the upstream API shape.
+Endpoint runner payload flags are accepted only for `POST` and `PUT`; `GET` and
+`DELETE` reject payloads so dry-runs cannot show a body that the live request
+would ignore.
 
 ## Invoice Ninja Direction
 

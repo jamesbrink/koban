@@ -227,6 +227,9 @@ Safety rules:
   commands require `--yes` unless `--dry-run` is used.
 - Generic endpoint runners require `--yes` for non-GET methods unless
   `--dry-run` is used.
+- Generic endpoint runner payload flags are valid only with `POST` and `PUT`;
+  `GET` and `DELETE` reject payloads instead of silently dropping request
+  bodies.
 - `create` and `update` require `--yes` when they send email, mark paid, record
   an amount paid, cancel, or retry e-send on invoice-specific commands.
 - Mocked tests are required for every write path. Live write smoke tests must be

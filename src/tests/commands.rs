@@ -551,6 +551,38 @@ async fn utility_defaults_to_safe_ping_get() {
 }
 
 #[tokio::test]
+async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    for method in [HttpMethod::Get, HttpMethod::Delete] {
+        let error = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
+                    endpoint: Some("preview".to_string()),
+                    method: Some(method),
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.fields.push("query=acme".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect_err("bodyless endpoint method should reject payload");
+        assert!(matches!(error, KobanError::InvalidPayload { .. }));
+        assert!(error.to_string().contains(method.label()), "got: {error}");
+    }
+}
+
+#[tokio::test]
 async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
     let server = MockServer::start();
     let config = Config::from_values(server.base_url(), "token").expect("config");
