@@ -2,7 +2,7 @@
 set -eu
 
 max_source_lines=900
-max_test_lines=1300
+max_test_lines=1100
 failed=0
 
 check_file() {
@@ -15,9 +15,9 @@ check_file() {
   fi
 }
 
-for file in src/*.rs; do
+for file in $(find src tests -name '*.rs' -type f); do
   case "$file" in
-    src/tests.rs)
+    src/tests/*|tests/*)
       check_file "$file" "$max_test_lines"
       ;;
     *)
