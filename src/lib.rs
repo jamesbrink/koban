@@ -707,10 +707,10 @@ fn unix_timestamp(value: &Value) -> Option<i64> {
         _ => return None,
     };
 
-    Some(if timestamp.abs() >= 1_000_000_000_000 {
-        timestamp / 1_000
-    } else {
+    Some(if looks_like_reasonable_unix_seconds(timestamp) {
         timestamp
+    } else {
+        timestamp.div_euclid(1_000)
     })
 }
 
@@ -718,6 +718,11 @@ fn format_unix_date(timestamp: i64) -> Option<String> {
     let days = timestamp.div_euclid(86_400);
     let (year, month, day) = civil_from_days(days)?;
     Some(format!("{year:04}-{month:02}-{day:02}"))
+}
+
+fn looks_like_reasonable_unix_seconds(timestamp: i64) -> bool {
+    let days = timestamp.div_euclid(86_400);
+    civil_from_days(days).is_some_and(|(year, _, _)| (1900..=9999).contains(&year))
 }
 
 fn civil_from_days(days: i64) -> Option<(i32, u32, u32)> {
@@ -1071,11 +1076,13 @@ mod tests {
         let value = serde_json::json!({
             "created_at": 1744305114,
             "updated_at": "1730754263000",
+            "legacy_millis": 946684800000_i64,
             "date": "2026-05-16"
         });
 
         assert_eq!(date_field(&value, &["created_at"]), "2025-04-10");
         assert_eq!(date_field(&value, &["updated_at"]), "2024-11-04");
+        assert_eq!(date_field(&value, &["legacy_millis"]), "2000-01-01");
         assert_eq!(date_field(&value, &["date"]), "2026-05-16");
         assert_eq!(date_field(&value, &["missing"]), "-");
     }
