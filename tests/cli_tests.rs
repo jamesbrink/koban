@@ -701,6 +701,37 @@ fn invoice_create_send_email_requires_confirmation() {
 }
 
 #[test]
+fn invoice_create_trigger_only_still_requires_payload() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args(["invoices", "create", "--mark-sent", "--dry-run"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("create requires JSON input"));
+}
+
+#[test]
+fn invoice_amount_paid_requires_paid_flag() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "update",
+            "invoice_1",
+            "--public-notes",
+            "paid",
+            "--amount-paid",
+            "10",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--amount-paid requires --paid"));
+}
+
+#[test]
 fn invoice_update_reads_payload_file_and_confirms_paid_trigger() {
     let server = MockServer::start();
     let mock = server.mock(|when, then| {
@@ -894,6 +925,24 @@ fn invoice_action_uses_custom_action_route_when_confirmed() {
         .stdout(predicate::str::contains("paid"));
 
     mock.assert();
+}
+
+#[test]
+fn invoice_action_rejects_unsafe_path_segments() {
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+        .args([
+            "invoices",
+            "action",
+            "invoice_1",
+            "--action",
+            "../clients",
+            "--dry-run",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("safe single path"));
 }
 
 #[test]
