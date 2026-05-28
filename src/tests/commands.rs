@@ -393,7 +393,15 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
     .await
     .expect("recurring invoice action dry run");
     assert!(
-        get_action.contains("\"method\": \"GET\""),
+        get_action.contains("\"method\": \"POST\""),
+        "got: {get_action}"
+    );
+    assert!(
+        get_action.contains("api/v1/recurring_invoices/bulk"),
+        "got: {get_action}"
+    );
+    assert!(
+        get_action.contains("\"ids\": [\n      \"recurring_1\"\n    ]"),
         "got: {get_action}"
     );
 

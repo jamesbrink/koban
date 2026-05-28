@@ -112,6 +112,9 @@ koban search run --field query=acme --dry-run
 koban reports run --endpoint reports --data-file report.json --dry-run
 ```
 
+Recurring invoice single-record actions are sent through Invoice Ninja's bulk
+action endpoint with a one-item `ids` list, matching the upstream API shape.
+
 ## Invoice Ninja Direction
 
 Invoice Ninja v5 exposes an API under `/api/v1`. Hosted production is

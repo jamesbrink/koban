@@ -139,8 +139,15 @@ impl ApiClient {
         query: &[(String, String)],
         files: &[PathBuf],
     ) -> Result<Value> {
-        self.multipart(reqwest::Method::PUT, path, query, files)
-            .await
+        self.multipart(
+            reqwest::Method::PUT,
+            path,
+            query,
+            files,
+            None,
+            "documents[]",
+        )
+        .await
     }
 
     pub async fn post_multipart(
@@ -149,8 +156,15 @@ impl ApiClient {
         query: &[(String, String)],
         files: &[PathBuf],
     ) -> Result<Value> {
-        self.multipart(reqwest::Method::POST, path, query, files)
-            .await
+        self.multipart(
+            reqwest::Method::POST,
+            path,
+            query,
+            files,
+            Some("POST"),
+            "documents",
+        )
+        .await
     }
 
     async fn multipart(
@@ -159,10 +173,15 @@ impl ApiClient {
         path: &str,
         query: &[(String, String)],
         files: &[PathBuf],
+        method_override: Option<&'static str>,
+        file_field: &'static str,
     ) -> Result<Value> {
         let url = self.endpoint(path, query)?;
         let endpoint = endpoint_label(&url);
         let mut form = reqwest::multipart::Form::new();
+        if let Some(method_override) = method_override {
+            form = form.text("_method", method_override);
+        }
 
         for path in files {
             let bytes = fs::read(path).map_err(|source| KobanError::File {
@@ -173,7 +192,7 @@ impl ApiClient {
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "document".to_string());
             let part = reqwest::multipart::Part::bytes(bytes).file_name(file_name);
-            form = form.part("documents[]", part);
+            form = form.part(file_field, part);
         }
 
         let response = self

@@ -989,6 +989,43 @@ fn invoice_upload_puts_multipart_when_confirmed() {
 }
 
 #[test]
+fn generic_upload_posts_multipart_method_override_when_confirmed() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/clients/client_1/upload")
+            .body_includes("name=\"_method\"")
+            .body_includes("POST")
+            .body_includes("name=\"documents\"")
+            .header("X-API-TOKEN", "test-token");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "client_1",
+                "name": "Acme",
+                "documents": [{"name": "note.txt"}]
+            }
+        }));
+    });
+    let dir = tempdir().expect("tempdir");
+    let file = dir.path().join("note.txt");
+    std::fs::write(&file, "hello").expect("upload fixture");
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "--output", "json", "clients", "upload", "client_1", "--file",
+        ])
+        .arg(&file)
+        .args(["--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"note.txt\""));
+
+    mock.assert();
+}
+
+#[test]
 fn invoice_payload_validation_is_actionable_without_network() {
     koban()
         .env("INVOICE_NINJA_API_TOKEN", "test-token")

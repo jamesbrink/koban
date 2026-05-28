@@ -217,6 +217,8 @@ Koban intentionally does not expose the documented `redirect` trigger.
 Note: the interactive docs label invoice document upload as `POST`, but the
 public demo API currently accepts `PUT /api/v1/invoices/{id}/upload`; Koban uses
 the live-compatible method for invoices and `POST` for generic resource uploads.
+Generic multipart uploads include Invoice Ninja's `_method=POST` form field and
+use the documented `documents` file field.
 
 Safety rules:
 
@@ -332,6 +334,11 @@ koban expenses edit-template <expense_id> --output json
 koban projects list --filter client_id=<client_id>
 koban tasks list --all --limit 50
 ```
+
+Recurring invoice single-record actions are represented as
+`POST /api/v1/recurring_invoices/bulk` with the requested action and a one-item
+`ids` list, because the upstream API documents recurring lifecycle actions on
+the bulk endpoint.
 
 ## Open Questions
 

@@ -371,6 +371,23 @@ async fn execute_resource_action(
     let has_body = body.as_object().is_some_and(|body| !body.is_empty());
     let mut query = Vec::new();
     push_include(&mut query, args.include);
+
+    if resource == Resource::RecurringInvoices {
+        let path = format!("api/v1/{}/bulk", resource.path());
+        let mut bulk_body = json!({
+            "action": args.action,
+            "ids": [args.id],
+        });
+        merge_resource_action_payload(&mut bulk_body, body);
+
+        if args.safety.dry_run {
+            return render_dry_run("POST", &path, &query, Some(&bulk_body), None);
+        }
+
+        let json = client.post_json(&path, &query, &bulk_body).await?;
+        return render_value(output, Some(resource), &json);
+    }
+
     let path = format!("api/v1/{}/{}/{}", resource.path(), args.id, args.action);
 
     if args.safety.dry_run {
@@ -389,6 +406,20 @@ async fn execute_resource_action(
         client.get_json(&path, &query).await?
     };
     render_value(output, Some(resource), &json)
+}
+
+fn merge_resource_action_payload(target: &mut Value, extra: Value) {
+    let Some(extra) = extra.as_object() else {
+        return;
+    };
+    let Some(target) = target.as_object_mut() else {
+        return;
+    };
+    for (key, value) in extra {
+        if key != "action" && key != "ids" {
+            target.insert(key.clone(), value.clone());
+        }
+    }
 }
 
 async fn execute_invoice(
