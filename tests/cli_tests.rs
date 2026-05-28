@@ -17,6 +17,7 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
         .stdout(predicate::str::contains("payments"))
+        .stdout(predicate::str::contains("update"))
         .stdout(predicate::str::contains("completions"));
 }
 
@@ -50,6 +51,18 @@ fn version_reports_package_version() {
         .assert()
         .success()
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn update_help_mentions_supported_install_sources() {
+    koban()
+        .args(["update", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Nix"))
+        .stdout(predicate::str::contains("cargo install"))
+        .stdout(predicate::str::contains("Homebrew"))
+        .stdout(predicate::str::contains("api.github.com"));
 }
 
 #[test]
