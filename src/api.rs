@@ -300,8 +300,5 @@ fn first_json_string(value: &Value, path: &[&str]) -> Option<String> {
 }
 
 fn endpoint_label(url: &Url) -> String {
-    match url.query() {
-        Some(query) => format!("{}?{query}", url.path()),
-        None => url.path().to_string(),
-    }
+    url.as_str().to_string()
 }

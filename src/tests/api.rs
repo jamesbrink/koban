@@ -86,7 +86,10 @@ async fn json_write_methods_report_decode_api_and_transport_errors() {
         .await
         .expect_err("API failure");
     assert!(matches!(api, KobanError::Api { .. }));
-    assert!(api.to_string().contains("bad invoice"));
+    let api_message = api.to_string();
+    assert!(api_message.contains("bad invoice"));
+    assert!(api_message.contains(&server.base_url()));
+    assert!(api_message.contains("/api/v1/invoices/invoice_1"));
     api_failure.assert();
 
     let offline =
