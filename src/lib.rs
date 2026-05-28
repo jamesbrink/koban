@@ -1239,11 +1239,40 @@ mod tests {
                 output: OutputFormat::Table,
                 command: None,
             },
-            config,
+            config.clone(),
         )
         .await
         .expect("execute none");
         assert!(output.is_empty());
+
+        let output = execute(Cli {
+            output: OutputFormat::Table,
+            command: Some(Commands::Update {
+                check: true,
+                force: false,
+                tag: None,
+                nightly: true,
+            }),
+        })
+        .await
+        .expect("execute nightly check");
+        assert!(output.contains("Nightly build available"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Table,
+                command: Some(Commands::Update {
+                    check: true,
+                    force: false,
+                    tag: None,
+                    nightly: true,
+                }),
+            },
+            config,
+        )
+        .await
+        .expect("execute nightly check with config");
+        assert!(output.contains("Nightly build available"), "got: {output}");
     }
 
     #[tokio::test]
