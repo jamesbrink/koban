@@ -114,6 +114,23 @@ nix build
 nix run . -- --help
 ```
 
+Inside `nix develop`, the devshell menu exposes helper commands:
+
+```text
+build           cargo build (debug)
+build-release   cargo build --release
+check           cargo check
+clippy          cargo clippy -- -D warnings
+fmt             cargo fmt
+fmt-check       cargo fmt --all -- --check
+run-tests       cargo test
+ci-local        run the Rust-side CI sequence
+coverage        cargo llvm-cov summary, or --html for a report
+koban           cargo run -- ...
+koban-help      show koban help
+smoke-statics   safe live GET /api/v1/statics smoke test
+```
+
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on
 both x86_64 and aarch64.

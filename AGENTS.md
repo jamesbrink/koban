@@ -15,3 +15,8 @@ surface read-only unless James explicitly asks for write support:
 - Preserve stable JSON output for agents alongside useful table output for
   humans.
 - Prefer mocked API tests for new command behavior.
+
+The Nix devshell intentionally exposes the project helper menu. Keep these
+helpers in sync with README.md and CI when editing `flake.nix`: `build`,
+`build-release`, `check`, `clippy`, `fmt`, `fmt-check`, `run-tests`, `ci-local`,
+`coverage`, `koban`, `koban-help`, and `smoke-statics`.
