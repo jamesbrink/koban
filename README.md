@@ -109,7 +109,7 @@ koban products update <id> --field notes="Hourly support" --dry-run
 koban products delete <id> --dry-run
 koban recurring-invoices action <id> --action start --dry-run
 koban search run --field query=acme --dry-run
-koban reports run --endpoint reports --data-file report.json --dry-run
+koban reports run --data-file report.json --dry-run
 ```
 
 Recurring invoice single-record actions are sent through Invoice Ninja's bulk

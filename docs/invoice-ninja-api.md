@@ -337,7 +337,7 @@ koban products create --name Consulting --price 100 --dry-run
 koban products update <product_id> --field notes="Hourly support" --dry-run
 koban recurring-invoices action <recurring_invoice_id> --action start --dry-run
 koban search run --field query=acme --dry-run
-koban reports run --endpoint reports --data-file report.json --dry-run
+koban reports run --data-file report.json --dry-run
 koban quotes list --output table
 koban credits show <credit_id> --output json
 koban vendors template --output json
