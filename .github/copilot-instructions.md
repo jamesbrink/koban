@@ -54,3 +54,7 @@ Inside `nix develop`, helper commands include `fmt-check`, `clippy`,
 Release automation lives in `.github/workflows/release-please.yml`. Koban is a
 plain CLI, so do not add code signing or notarization unless explicitly requested. Release tarball asset names, `SHA256SUMS`, `koban update`, and
 `install.sh` must stay in sync.
+
+Nightly automation lives in `.github/workflows/nightly.yml`. It builds current
+`main` into a rolling `nightly` prerelease via `nightly-staging`. Keep
+`koban update --nightly` and nightly assets aligned with stable release assets.
