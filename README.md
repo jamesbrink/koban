@@ -14,6 +14,7 @@ completions, and exposes a small read-only Invoice Ninja API surface.
 ```sh
 koban --help
 koban --version
+koban update --check
 koban completions zsh
 koban completions bash
 koban completions fish
@@ -134,6 +135,22 @@ smoke-statics   safe live GET /api/v1/statics smoke test
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on
 both x86_64 and aarch64.
+
+## Releases
+
+Releases are managed by release-please. When a release is cut, CI builds
+unsigned CLI tarballs for macOS and Linux, uploads `SHA256SUMS`, and publishes
+the crate to crates.io using `CARGO_REGISTRY_TOKEN`.
+
+`koban update` downloads those GitHub release tarballs and verifies checksums
+for direct installs. Package-manager installs are left alone and get an upgrade
+recipe instead:
+
+```sh
+koban update --check
+koban update
+koban update --tag v0.1.0
+```
 
 ## API Notes
 

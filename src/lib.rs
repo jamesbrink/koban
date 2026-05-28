@@ -3,6 +3,8 @@
 //! The public surface is intentionally small while the CLI and Invoice Ninja
 //! client model settle.
 
+pub mod update;
+
 use std::{env, fmt};
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
@@ -34,6 +36,7 @@ Examples:
   koban clients show <client_id> --output json
   koban invoices template --output json
   koban invoices edit-template <invoice_id> --output json
+  koban update --check
 
 Environment:
   INVOICE_NINJA_API_TOKEN  Required API token
@@ -107,6 +110,31 @@ Examples:
     /// Read payments
     #[command(subcommand)]
     Payments(ResourceCommand),
+
+    /// Update koban from GitHub Releases or print the right package-manager recipe
+    #[command(after_long_help = "\
+Upgrade koban in place when installed from a release tarball. For other install
+sources the command prints the right upgrade recipe and exits:
+
+  Nix:       nix profile upgrade koban   (or flake update)
+  cargo:     cargo install --git https://github.com/jamesbrink/koban --tag vX.Y.Z --force koban
+  Homebrew:  brew upgrade koban
+
+The latest tag is resolved by following the /releases/latest redirect, so this
+command does not hit api.github.com and avoids anonymous API rate limits.")]
+    Update {
+        /// Report whether an update is available without writing to disk
+        #[arg(long)]
+        check: bool,
+
+        /// Reinstall or downgrade even when the target matches the current version
+        #[arg(long)]
+        force: bool,
+
+        /// Install a specific release tag instead of the latest release
+        #[arg(long, value_name = "TAG")]
+        tag: Option<String>,
+    },
 
     /// Generate shell completions
     #[command(after_long_help = "\
@@ -309,6 +337,12 @@ pub enum KobanError {
 
     #[error("Invoice Ninja returned a response Koban could not decode: {message}")]
     Decode { message: String },
+
+    #[error("update failed: {message}")]
+    #[diagnostic(help(
+        "Run `koban update --check` to inspect the latest release without modifying the installed binary."
+    ))]
+    Update { message: String },
 }
 
 pub type Result<T> = std::result::Result<T, KobanError>;
@@ -374,8 +408,16 @@ impl ApiClient {
 }
 
 pub async fn execute(cli: Cli) -> Result<String> {
-    let config = Config::from_env()?;
-    execute_with_config(cli, config).await
+    let output = cli.output;
+    let command = cli.command;
+
+    match command {
+        Some(Commands::Update { check, force, tag }) => update::run(check, force, tag),
+        command => {
+            let config = Config::from_env()?;
+            execute_with_config(Cli { output, command }, config).await
+        }
+    }
 }
 
 pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
@@ -396,7 +438,9 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Payments(command)) => {
             execute_resource(&client, output, Resource::Payments, command).await
         }
-        Some(Commands::Completions { .. }) | None => Ok(String::new()),
+        Some(Commands::Update { .. }) | Some(Commands::Completions { .. }) | None => {
+            Ok(String::new())
+        }
     }
 }
 

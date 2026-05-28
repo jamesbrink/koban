@@ -78,6 +78,7 @@ fn dynamic_root_completions_include_resources() {
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
         .stdout(predicate::str::contains("payments"))
+        .stdout(predicate::str::contains("update"))
         .stdout(predicate::str::contains("completions"));
 }
 
