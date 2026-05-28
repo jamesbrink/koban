@@ -196,6 +196,86 @@ fn table_output_renders_new_read_only_resources() {
 }
 
 #[test]
+fn table_output_renders_expanded_resource_rows() {
+    let cases = [
+        (
+            Resource::Products,
+            serde_json::json!({"data": [{
+                "id": "product_1",
+                "product_key": "CONSULT",
+                "notes": "Consulting",
+                "price": 100,
+                "created_at": "2026-03-07"
+            }]}),
+            ["CONSULT", "Consulting", "100"],
+        ),
+        (
+            Resource::PurchaseOrders,
+            serde_json::json!({"data": [{
+                "id": "po_1",
+                "number": "PO-1",
+                "vendor": {"display_name": "Paper Co"},
+                "amount": 24,
+                "date": "2026-03-08"
+            }]}),
+            ["PO-1", "Paper Co", "24"],
+        ),
+        (
+            Resource::RecurringInvoices,
+            serde_json::json!({"data": [{
+                "id": "rec_1",
+                "number": "R-1",
+                "client_id": "client_1",
+                "frequency_id": "monthly",
+                "amount": 40,
+                "date": "2026-03-09"
+            }]}),
+            ["R-1", "monthly", "40"],
+        ),
+        (
+            Resource::RecurringExpenses,
+            serde_json::json!({"data": [{
+                "id": "rexp_1",
+                "transaction_id": "RTX-1",
+                "description": "Hosting",
+                "amount": 12,
+                "date": "2026-03-09"
+            }]}),
+            ["rexp_1", "Hosting", "12"],
+        ),
+        (
+            Resource::BankTransactions,
+            serde_json::json!({"data": [{
+                "id": "bt_1",
+                "transaction_id": "TX-2",
+                "description": "Deposit",
+                "amount": 80,
+                "date": "2026-03-10"
+            }]}),
+            ["TX-2", "Deposit", "80"],
+        ),
+        (
+            Resource::Webhooks,
+            serde_json::json!({"data": [{
+                "id": "hook_1",
+                "event": "invoice.created",
+                "target_url": "https://example.test",
+                "is_deleted": false,
+                "created_at": "2026-03-11"
+            }]}),
+            ["hook_1", "false", "2026-03-11"],
+        ),
+    ];
+
+    for (resource, value, expected_parts) in cases {
+        let output = render_value(OutputFormat::Table, Some(resource), &value).expect("table");
+        for expected in expected_parts {
+            assert!(output.contains(expected), "missing {expected}: {output}");
+        }
+    }
+}
+
+#[test]
 fn quote_status_maps_known_statuses_and_fallbacks() {
     let cases = [(1, "draft"), (2, "sent"), (3, "approved"), (4, "converted")];
 

@@ -17,6 +17,38 @@ fn completion_shell_display_uses_documented_names() {
 }
 
 #[test]
+fn http_methods_render_uppercase_labels() {
+    assert_eq!(HttpMethod::Get.label(), "GET");
+    assert_eq!(HttpMethod::Post.label(), "POST");
+    assert_eq!(HttpMethod::Put.label(), "PUT");
+    assert_eq!(HttpMethod::Delete.label(), "DELETE");
+}
+
+#[test]
+fn expanded_resource_labels_and_upload_methods_are_stable() {
+    let labels = [
+        (Resource::PurchaseOrders, "purchase orders"),
+        (Resource::RecurringExpenses, "recurring expenses"),
+        (Resource::BankTransactions, "bank transactions"),
+        (Resource::BankIntegrations, "bank integrations"),
+        (Resource::BankTransactionRules, "bank transaction rules"),
+        (Resource::PaymentTerms, "payment terms"),
+        (Resource::TaskStatuses, "task statuses"),
+        (Resource::SystemLogs, "system logs"),
+        (Resource::CompanyGateways, "company gateways"),
+        (Resource::CompanyLedger, "company ledger"),
+        (Resource::CompanyUsers, "company users"),
+        (Resource::ClientGatewayTokens, "client gateway tokens"),
+    ];
+
+    for (resource, label) in labels {
+        assert_eq!(resource.label(), label);
+    }
+    assert_eq!(Resource::Invoices.upload_method(), "PUT");
+    assert_eq!(Resource::Products.upload_method(), "POST");
+}
+
+#[test]
 fn config_preserves_self_hosted_path_prefix_without_trailing_slash() {
     let config = Config::from_values("https://example.com/invoiceninja", "token").expect("config");
     let client = ApiClient::new(config);

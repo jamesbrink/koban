@@ -19,17 +19,17 @@ The `main` branch is protected. Use pull requests for changes and keep the
 required CI contexts green: `fmt`, `check`, `clippy`, `test`, and `build`.
 Resolve review conversations before merging.
 
-Koban is an early Rust CLI for Invoice Ninja. The implemented API surface is
-read-first, with guarded invoice write commands:
+Koban is an early Rust CLI for Invoice Ninja. The implemented API surface spans
+the official resource families with guarded write commands:
 
 - Prefer the public Invoice Ninja demo endpoint for live smoke tests:
   `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
   `INVOICE_NINJA_API_TOKEN=TOKEN`.
-- Invoice write commands must keep `--dry-run` previews and `--yes`
-  confirmation gates for destructive or externally visible mutations.
-- Do not smoke test unimplemented write families such as client/payment writes,
-  imports, purges, refunds, merges, or scheduler endpoints against any
-  environment unless that support has been explicitly implemented and reviewed.
+- Write commands must keep `--dry-run` previews and `--yes` confirmation gates
+  for destructive or externally visible mutations.
+- Do not live-smoke high-risk endpoints such as imports, purges, refunds,
+  merges, scheduler, support, or admin utility routes unless the smoke helper is
+  demo-only, opt-in, and creates/cleans up its own fixtures.
 - Use production or personal accounts only for intentional checks.
 - Keep token handling environment-first with `INVOICE_NINJA_API_TOKEN` and
   optional `INVOICE_NINJA_BASE_URL`.
@@ -45,6 +45,8 @@ helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `smoke-invoice-write-demo`, and `smoke-all-demo`.
 The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
 the gitignored `.env` file when those variables are not already set.
+Mutating smoke helpers must hard-code the public demo API internally so they
+cannot inherit a production or personal endpoint.
 
 Release automation lives in `.github/workflows/release-please.yml`. Koban is a
 plain CLI: do not add code signing or notarization unless explicitly requested.

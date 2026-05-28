@@ -290,10 +290,10 @@
                     echo "Set KOBAN_LIVE_WRITE_SMOKE=1 to run this mutating demo smoke test." >&2
                     exit 2
                   fi
-                  if [ "''${INVOICE_NINJA_BASE_URL:-}" != "https://demo.invoiceninja.com" ] || [ "''${INVOICE_NINJA_API_TOKEN:-}" != "TOKEN" ]; then
-                    echo "This helper only runs against https://demo.invoiceninja.com with token TOKEN." >&2
-                    exit 2
-                  fi
+                  readonly INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
+                  readonly INVOICE_NINJA_API_TOKEN="TOKEN"
+                  export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN
+                  echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
                   client_id="$(
                     cargo run -- --output json clients list --per-page 1 \

@@ -18,11 +18,9 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Invoice Ninja"))
+        .stdout(predicate::str::contains("List, show, and inspect clients"))
         .stdout(predicate::str::contains(
-            "clients      List, show, and inspect clients",
-        ))
-        .stdout(predicate::str::contains(
-            "invoices     List, show, create, update, and manage invoices",
+            "List, show, create, update, and manage invoices",
         ))
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
@@ -33,6 +31,11 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
         .stdout(predicate::str::contains("expenses"))
         .stdout(predicate::str::contains("projects"))
         .stdout(predicate::str::contains("tasks"))
+        .stdout(predicate::str::contains("products"))
+        .stdout(predicate::str::contains("recurring-invoices"))
+        .stdout(predicate::str::contains("purchase-orders"))
+        .stdout(predicate::str::contains("webhooks"))
+        .stdout(predicate::str::contains("search"))
         .stdout(predicate::str::contains("update"))
         .stdout(predicate::str::contains("completions"));
 }

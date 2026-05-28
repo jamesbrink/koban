@@ -139,6 +139,27 @@ impl ApiClient {
         query: &[(String, String)],
         files: &[PathBuf],
     ) -> Result<Value> {
+        self.multipart(reqwest::Method::PUT, path, query, files)
+            .await
+    }
+
+    pub async fn post_multipart(
+        &self,
+        path: &str,
+        query: &[(String, String)],
+        files: &[PathBuf],
+    ) -> Result<Value> {
+        self.multipart(reqwest::Method::POST, path, query, files)
+            .await
+    }
+
+    async fn multipart(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        query: &[(String, String)],
+        files: &[PathBuf],
+    ) -> Result<Value> {
         let url = self.endpoint(path, query)?;
         let endpoint = endpoint_label(&url);
         let mut form = reqwest::multipart::Form::new();
@@ -157,7 +178,7 @@ impl ApiClient {
 
         let response = self
             .http
-            .put(url)
+            .request(method, url)
             .header("X-API-TOKEN", &self.config.api_token)
             .header("X-Requested-With", REQUESTED_WITH)
             .multipart(form)

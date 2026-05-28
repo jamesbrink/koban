@@ -199,6 +199,408 @@ async fn execute_invoice_dry_runs_cover_write_commands_without_network() {
 }
 
 #[tokio::test]
+async fn expanded_resource_and_endpoint_dry_runs_do_not_touch_network() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    let create = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Products(ResourceCommand::Create(
+                ResourceWriteArgs {
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.name = Some("Consulting".to_string());
+                        args.price = Some("100".to_string());
+                        args.fields.push("tax_name1=GST".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: vec!["documents".to_string()],
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("product create dry run");
+    assert!(
+        create.contains("\"path\": \"api/v1/products\""),
+        "got: {create}"
+    );
+    assert!(create.contains("\"price\": 100"), "got: {create}");
+
+    let update = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::PurchaseOrders(ResourceCommand::Update(
+                UpdateResourceArgs {
+                    id: "po_1".to_string(),
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.vendor_id = Some("vendor_1".to_string());
+                        args.line_items
+                            .push("product_key=Paper,quantity=2,cost=4".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("purchase order update dry run");
+    assert!(
+        update.contains("api/v1/purchase_orders/po_1"),
+        "got: {update}"
+    );
+    assert!(update.contains("\"line_items\""), "got: {update}");
+
+    let search = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Search(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: HttpMethod::Post,
+                payload: {
+                    let mut args = empty_resource_payload_args();
+                    args.fields.push("query=acme".to_string());
+                    args
+                },
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect("search dry run");
+    assert!(
+        search.contains("\"path\": \"api/v1/search\""),
+        "got: {search}"
+    );
+    assert!(search.contains("\"query\": \"acme\""), "got: {search}");
+}
+
+#[tokio::test]
+async fn every_expanded_resource_has_reachable_dry_run_writes() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    for (label, command) in expanded_resource_create_commands() {
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(command),
+            },
+            config.clone(),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{label} create dry run failed: {error}"));
+        assert!(output.contains("\"dry_run\": true"), "{label}: {output}");
+        assert!(output.contains("\"method\": \"POST\""), "{label}: {output}");
+    }
+
+    let delete = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Webhooks(ResourceCommand::Delete(
+                ConfirmableIdArgs {
+                    id: "webhook_1".to_string(),
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("webhook delete dry run");
+    assert!(delete.contains("\"method\": \"DELETE\""), "got: {delete}");
+
+    let bulk = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::TaxRates(ResourceCommand::Bulk(BulkArgs {
+                action: "archive".to_string(),
+                ids: vec!["one".to_string()],
+                email_type: None,
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("tax rates bulk dry run");
+    assert!(bulk.contains("api/v1/tax_rates/bulk"), "got: {bulk}");
+
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let upload_file = tempdir.path().join("doc.txt");
+    std::fs::write(&upload_file, b"document").expect("upload fixture");
+    let upload = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Documents(ResourceCommand::Upload(UploadArgs {
+                id: "document_1".to_string(),
+                files: vec![upload_file],
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("document upload dry run");
+    assert!(upload.contains("\"method\": \"POST\""), "got: {upload}");
+
+    let get_action = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::RecurringInvoices(ResourceCommand::Action(
+                ResourceActionArgs {
+                    id: "recurring_1".to_string(),
+                    action: "start".to_string(),
+                    payload: empty_resource_payload_args(),
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("recurring invoice action dry run");
+    assert!(
+        get_action.contains("\"method\": \"GET\""),
+        "got: {get_action}"
+    );
+
+    let post_action = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Clients(ResourceCommand::Action(
+                ResourceActionArgs {
+                    id: "client_1".to_string(),
+                    action: "updateTaxData".to_string(),
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.fields.push("country_id=840".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config,
+    )
+    .await
+    .expect("client post action dry run");
+    assert!(
+        post_action.contains("\"method\": \"POST\""),
+        "got: {post_action}"
+    );
+}
+
+#[tokio::test]
+async fn generic_resource_and_endpoint_commands_hit_expected_routes() {
+    let server = MockServer::start();
+    let config = Config::from_values(server.base_url(), "token").expect("config");
+
+    let product_create = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/products");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"id": "product_1"}}));
+    });
+    let product_update = server.mock(|when, then| {
+        when.method(PUT).path("/api/v1/products/product_1");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"id": "product_1"}}));
+    });
+    let webhook_delete = server.mock(|when, then| {
+        when.method(httpmock::Method::DELETE)
+            .path("/api/v1/webhooks/webhook_1");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"id": "webhook_1"}}));
+    });
+    let report_get = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/reports");
+        then.status(200)
+            .json_body(serde_json::json!({"data": [{"name": "sales"}]}));
+    });
+    let chart_put = server.mock(|when, then| {
+        when.method(PUT).path("/api/v1/charts");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"name": "chart"}}));
+    });
+    let utility_delete = server.mock(|when, then| {
+        when.method(httpmock::Method::DELETE)
+            .path("/api/v1/support/ticket_1");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"id": "ticket_1"}}));
+    });
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Products(ResourceCommand::Create(
+                ResourceWriteArgs {
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.name = Some("Consulting".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: false,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("product create");
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Products(ResourceCommand::Update(
+                UpdateResourceArgs {
+                    id: "product_1".to_string(),
+                    payload: {
+                        let mut args = empty_resource_payload_args();
+                        args.price = Some("150".to_string());
+                        args
+                    },
+                    safety: WriteSafetyArgs {
+                        dry_run: false,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("product update");
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Webhooks(ResourceCommand::Delete(
+                ConfirmableIdArgs {
+                    id: "webhook_1".to_string(),
+                    safety: WriteSafetyArgs {
+                        dry_run: false,
+                        yes: true,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("webhook delete");
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: HttpMethod::Get,
+                payload: empty_resource_payload_args(),
+                safety: WriteSafetyArgs {
+                    dry_run: false,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("report get");
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Charts(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: HttpMethod::Put,
+                payload: {
+                    let mut args = empty_resource_payload_args();
+                    args.fields.push("name=revenue".to_string());
+                    args
+                },
+                safety: WriteSafetyArgs {
+                    dry_run: false,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("chart put");
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
+                endpoint: Some("support/ticket_1".to_string()),
+                method: HttpMethod::Delete,
+                payload: empty_resource_payload_args(),
+                safety: WriteSafetyArgs {
+                    dry_run: false,
+                    yes: true,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect("utility delete");
+
+    product_create.assert();
+    product_update.assert();
+    webhook_delete.assert();
+    report_get.assert();
+    chart_put.assert();
+    utility_delete.assert();
+}
+
+#[tokio::test]
 async fn multipart_upload_reports_missing_file_before_network() {
     let client = ApiClient::new(
         Config::from_values("http://localhost:1234", "secret-token").expect("config"),
@@ -400,4 +802,86 @@ async fn execute_resource_commands_against_mock_api() {
     payments.assert();
     client_template.assert();
     invoice_edit_template.assert();
+}
+
+fn expanded_resource_create_commands() -> Vec<(&'static str, Commands)> {
+    vec![
+        ("clients", Commands::Clients(create_command())),
+        ("payments", Commands::Payments(create_command())),
+        ("quotes", Commands::Quotes(create_command())),
+        ("credits", Commands::Credits(create_command())),
+        ("vendors", Commands::Vendors(create_command())),
+        ("expenses", Commands::Expenses(create_command())),
+        ("projects", Commands::Projects(create_command())),
+        ("tasks", Commands::Tasks(create_command())),
+        ("locations", Commands::Locations(create_command())),
+        ("products", Commands::Products(create_command())),
+        (
+            "recurring invoices",
+            Commands::RecurringInvoices(create_command()),
+        ),
+        (
+            "purchase orders",
+            Commands::PurchaseOrders(create_command()),
+        ),
+        (
+            "recurring expenses",
+            Commands::RecurringExpenses(create_command()),
+        ),
+        (
+            "bank transactions",
+            Commands::BankTransactions(create_command()),
+        ),
+        (
+            "bank integrations",
+            Commands::BankIntegrations(create_command()),
+        ),
+        (
+            "bank transaction rules",
+            Commands::BankTransactionRules(create_command()),
+        ),
+        (
+            "expense categories",
+            Commands::ExpenseCategories(create_command()),
+        ),
+        ("tax rates", Commands::TaxRates(create_command())),
+        ("payment terms", Commands::PaymentTerms(create_command())),
+        ("task statuses", Commands::TaskStatuses(create_command())),
+        ("activities", Commands::Activities(create_command())),
+        ("system logs", Commands::SystemLogs(create_command())),
+        ("documents", Commands::Documents(create_command())),
+        ("designs", Commands::Designs(create_command())),
+        ("templates", Commands::Templates(create_command())),
+        ("users", Commands::Users(create_command())),
+        ("companies", Commands::Companies(create_command())),
+        (
+            "company gateways",
+            Commands::CompanyGateways(create_command()),
+        ),
+        ("company ledger", Commands::CompanyLedger(create_command())),
+        ("company users", Commands::CompanyUsers(create_command())),
+        ("tokens", Commands::Tokens(create_command())),
+        ("webhooks", Commands::Webhooks(create_command())),
+        ("imports", Commands::Imports(create_command())),
+        ("subscriptions", Commands::Subscriptions(create_command())),
+        (
+            "client gateway tokens",
+            Commands::ClientGatewayTokens(create_command()),
+        ),
+    ]
+}
+
+fn create_command() -> ResourceCommand {
+    ResourceCommand::Create(ResourceWriteArgs {
+        payload: {
+            let mut args = empty_resource_payload_args();
+            args.name = Some("Koban Smoke".to_string());
+            args
+        },
+        safety: WriteSafetyArgs {
+            dry_run: true,
+            yes: false,
+        },
+        include: Vec::new(),
+    })
 }

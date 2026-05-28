@@ -12,9 +12,10 @@ they mix CLI parsing, HTTP, rendering, validation, and command execution.
 
 Use mocked HTTP tests for Invoice Ninja command behavior. Live smoke tests
 should prefer the public demo API at `https://demo.invoiceninja.com` with token
-`TOKEN`. Implemented invoice write commands must keep `--dry-run` previews and
-`--yes` confirmation gates where mutations are destructive or externally
-visible. Do not hit unimplemented live destructive endpoints.
+`TOKEN`. Implemented write commands must keep `--dry-run` previews and `--yes`
+confirmation gates where mutations are destructive or externally visible. Do
+not live-smoke high-risk destructive endpoints unless the helper is demo-only,
+opt-in, and cleans up its own fixtures.
 
 Run `cargo fmt --all -- --check`, `cargo check`,
 `scripts/check-code-health.sh`, `cargo clippy -- -D warnings`, and `cargo test`

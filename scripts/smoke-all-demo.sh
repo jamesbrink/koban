@@ -6,11 +6,11 @@ if [ "${KOBAN_LIVE_WRITE_SMOKE:-}" != "1" ]; then
   exit 2
 fi
 
-if [ "${INVOICE_NINJA_BASE_URL:-}" != "https://demo.invoiceninja.com" ] ||
-  [ "${INVOICE_NINJA_API_TOKEN:-}" != "TOKEN" ]; then
-  echo "This helper only runs against https://demo.invoiceninja.com with token TOKEN." >&2
-  exit 2
-fi
+readonly INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
+readonly INVOICE_NINJA_API_TOKEN="TOKEN"
+export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN
+
+echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
 run_json() {
   cargo run --quiet -- --output json "$@"
@@ -87,6 +87,18 @@ upload_dry_file=$(mktemp /tmp/koban-upload-dry.XXXXXX.txt)
 printf "dry upload\n" >"$upload_dry_file"
 run_json invoices upload dry_invoice --file "$upload_dry_file" --dry-run >/tmp/koban-upload-dry-run.json
 echo "upload_dry_run=$(jq -r .dry_run /tmp/koban-upload-dry-run.json) method=$(jq -r .method /tmp/koban-upload-dry-run.json)"
+
+echo "== expanded api dry-run commands =="
+run_json products create --name KobanSmokeProduct --price 1 --dry-run >/tmp/koban-product-create-dry-run.json
+echo "product_create_dry_run=$(jq -r .dry_run /tmp/koban-product-create-dry-run.json)"
+run_json products update product_dry --field notes=Updated --dry-run >/tmp/koban-product-update-dry-run.json
+echo "product_update_dry_run=$(jq -r .dry_run /tmp/koban-product-update-dry-run.json)"
+run_json products delete product_dry --dry-run >/tmp/koban-product-delete-dry-run.json
+echo "product_delete_dry_run=$(jq -r .dry_run /tmp/koban-product-delete-dry-run.json)"
+run_json purchase-orders action po_dry --action email --dry-run >/tmp/koban-purchase-order-action-dry-run.json
+echo "purchase_order_action_dry_run=$(jq -r .dry_run /tmp/koban-purchase-order-action-dry-run.json)"
+run_json search run --field query=KobanSmoke --dry-run >/tmp/koban-search-dry-run.json
+echo "search_dry_run=$(jq -r .dry_run /tmp/koban-search-dry-run.json)"
 
 invoice_id=$(
   run_json invoices create \
