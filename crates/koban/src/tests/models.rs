@@ -155,3 +155,143 @@ async fn generic_resource_handle_supports_caller_chosen_types() {
     assert_eq!(rows[0]["name"], "GST");
     mock.assert();
 }
+
+#[test]
+fn resource_accessors_target_expected_resources() {
+    let client = ApiClient::new(
+        Config::from_values("https://demo.invoiceninja.com", "token").expect("config"),
+    );
+    assert_eq!(client.clients().resource(), Resource::Clients);
+    assert_eq!(client.invoices().resource(), Resource::Invoices);
+    assert_eq!(client.payments().resource(), Resource::Payments);
+    assert_eq!(client.quotes().resource(), Resource::Quotes);
+    assert_eq!(client.credits().resource(), Resource::Credits);
+    assert_eq!(client.products().resource(), Resource::Products);
+    assert_eq!(client.expenses().resource(), Resource::Expenses);
+    assert_eq!(client.vendors().resource(), Resource::Vendors);
+    assert_eq!(client.projects().resource(), Resource::Projects);
+    assert_eq!(client.tasks().resource(), Resource::Tasks);
+    assert_eq!(
+        client
+            .resource::<serde_json::Value>(Resource::TaxRates)
+            .resource(),
+        Resource::TaxRates
+    );
+}
+
+#[test]
+fn every_model_round_trips_and_tolerates_string_numbers() {
+    use crate::models::{
+        Client, Contact, Credit, Expense, Payment, Product, Project, Quote, Task, Vendor,
+    };
+
+    let client: Client = serde_json::from_value(serde_json::json!({
+        "id": "c1", "display_name": "Acme", "balance": "10.5", "paid_to_date": 4,
+        "contacts": [{"email": "a@b.c", "is_primary": true, "zzz": 1}],
+        "zzz": "keep"
+    }))
+    .expect("client");
+    assert_eq!(client.balance, 10.5);
+    assert_eq!(client.contacts[0].email, "a@b.c");
+    assert!(client.contacts[0].extra.contains_key("zzz"));
+    assert_eq!(serde_json::to_value(&client).expect("ser")["zzz"], "keep");
+
+    let payment: Payment =
+        serde_json::from_value(serde_json::json!({"amount": 5, "refunded": "1.5", "applied": 5}))
+            .expect("payment");
+    assert_eq!(payment.refunded, 1.5);
+    let product: Product =
+        serde_json::from_value(serde_json::json!({"price": "9.99", "cost": 1, "quantity": 2}))
+            .expect("product");
+    assert_eq!(product.price, 9.99);
+    let quote: Quote =
+        serde_json::from_value(serde_json::json!({"amount": "2", "line_items": [{"cost": 1}]}))
+            .expect("quote");
+    assert_eq!(quote.amount, 2.0);
+    let credit: Credit =
+        serde_json::from_value(serde_json::json!({"balance": 3.0})).expect("credit");
+    assert_eq!(credit.balance, 3.0);
+    let expense: Expense =
+        serde_json::from_value(serde_json::json!({"amount": "4", "should_be_invoiced": true}))
+            .expect("expense");
+    assert!(expense.should_be_invoiced);
+    let vendor: Vendor =
+        serde_json::from_value(serde_json::json!({"name": "V", "contacts": [{"first_name": "X"}]}))
+            .expect("vendor");
+    assert_eq!(vendor.contacts[0].first_name, "X");
+    let project: Project =
+        serde_json::from_value(serde_json::json!({"task_rate": "50", "budgeted_hours": 8}))
+            .expect("project");
+    assert_eq!(project.task_rate, 50.0);
+    let task: Task = serde_json::from_value(serde_json::json!({"rate": 75.0, "is_running": true}))
+        .expect("task");
+    assert!(task.is_running);
+    let contact: Contact =
+        serde_json::from_value(serde_json::json!({"first_name": "Y"})).expect("contact");
+    assert_eq!(contact.first_name, "Y");
+
+    // Serialize each back to JSON to exercise the derived Serialize impls.
+    for value in [
+        serde_json::to_value(&payment).expect("payment ser"),
+        serde_json::to_value(&product).expect("product ser"),
+        serde_json::to_value(&quote).expect("quote ser"),
+        serde_json::to_value(&credit).expect("credit ser"),
+        serde_json::to_value(&expense).expect("expense ser"),
+        serde_json::to_value(&vendor).expect("vendor ser"),
+        serde_json::to_value(&project).expect("project ser"),
+        serde_json::to_value(&task).expect("task ser"),
+        serde_json::to_value(&contact).expect("contact ser"),
+    ] {
+        assert!(value.is_object());
+    }
+}
+
+#[test]
+fn flexible_deserializers_and_envelopes_cover_all_variants() {
+    // created_at as a string and as null exercise both i64_opt_flexible arms.
+    let from_string: Invoice =
+        serde_json::from_value(serde_json::json!({"created_at": "1716000000"})).expect("string ts");
+    assert_eq!(from_string.created_at, Some(1_716_000_000));
+    let from_null: Invoice =
+        serde_json::from_value(serde_json::json!({"created_at": null})).expect("null ts");
+    assert_eq!(from_null.created_at, None);
+
+    // A non-numeric value falls back to 0.0 (the f64_flexible catch-all arm).
+    let junk: Invoice =
+        serde_json::from_value(serde_json::json!({"amount": {"x": 1}})).expect("junk amount");
+    assert_eq!(junk.amount, 0.0);
+
+    // The envelopes serialize as well as deserialize.
+    let data = Data {
+        data: Invoice::default(),
+    };
+    assert!(serde_json::to_value(&data).expect("data ser")["data"].is_object());
+    let page = Paginated {
+        data: vec![Invoice::default()],
+        meta: None,
+    };
+    assert!(serde_json::to_value(&page).expect("page ser")["data"].is_array());
+}
+
+#[tokio::test]
+async fn list_paginated_exposes_pagination_meta() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/clients");
+        then.status(200)
+            .body(r#"{"data":[{"id":"c1"}],"meta":{"pagination":{"total":1,"per_page":20}}}"#);
+    });
+    let client = ApiClient::new(Config::from_values(server.base_url(), "token").expect("config"));
+    let page = client
+        .clients()
+        .list_paginated(&[("per_page".to_string(), "20".to_string())])
+        .await
+        .expect("paginated");
+    assert_eq!(page.data.len(), 1);
+    let pagination = page
+        .meta
+        .and_then(|meta| meta.pagination)
+        .expect("pagination");
+    assert_eq!(pagination.per_page, Some(20));
+    mock.assert();
+}

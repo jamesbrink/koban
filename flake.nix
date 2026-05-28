@@ -49,7 +49,19 @@
 
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
-          src = craneLib.cleanCargoSource ./.;
+          # Cargo sources plus the workflow files and READMEs the test suite and
+          # package metadata reference (code_health_tests reads .github/workflows).
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              (lib.fileset.fileFilter (
+                file:
+                file.hasExt "rs" || file.name == "Cargo.toml" || file.name == "Cargo.lock"
+                || file.name == "README.md"
+              ) ./.)
+              ./.github/workflows
+            ];
+          };
 
           # The root manifest is a virtual workspace; crate metadata lives in the
           # member manifests, and shared fields live under [workspace.package].
