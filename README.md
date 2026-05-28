@@ -7,7 +7,7 @@ shell completions.
 
 The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
 still early work: the CLI boots, reports its version, generates shell
-completions, and is growing a read-only Invoice Ninja API surface.
+completions, and exposes a small read-only Invoice Ninja API surface.
 
 ## Current CLI
 
@@ -26,10 +26,16 @@ The first API commands are read-only and use `GET` requests only:
 koban statics --output json
 koban clients list --page 1 --per-page 20
 koban clients show <id> --output json
+koban clients template --output json
+koban clients edit-template <id> --output json
 koban invoices list
 koban invoices show <id>
+koban invoices template --output json
+koban invoices edit-template <id> --output json
 koban payments list
 koban payments show <id>
+koban payments template --output json
+koban payments edit-template <id> --output json
 ```
 
 ## Invoice Ninja Direction
@@ -42,19 +48,29 @@ Authentication is token based. Requests require `X-API-TOKEN`, and the developer
 guide also documents `X-Requested-With: XMLHttpRequest` as a required security
 header. JSON write requests must send `Content-Type: application/json`.
 
-The first useful `koban` API surface should stay boring and durable:
+The implemented `koban` API surface is intentionally boring and durable:
 
 ```text
 koban statics
 koban clients list
 koban clients show <id>
+koban clients template
+koban clients edit-template <id>
 koban invoices list
 koban invoices show <id>
+koban invoices template
+koban invoices edit-template <id>
 koban payments list
 koban payments show <id>
+koban payments template
+koban payments edit-template <id>
 ```
 
-After that, creation and update commands can grow around explicit files or
+The `template` and `edit-template` commands use Invoice Ninja's read-only
+`GET /create` and `GET /{id}/edit` routes. They return default/editable payloads
+for schema discovery; they do not create or update records.
+
+Future creation and update commands should grow around explicit files or
 stdin-first JSON so agent workflows do not depend on prompts.
 
 ## Configuration Plan
@@ -69,6 +85,12 @@ export INVOICE_NINJA_API_TOKEN="..."
 `INVOICE_NINJA_BASE_URL` is optional and defaults to `https://invoicing.co`.
 Tokens must never be printed by default, and human-facing output should have a
 matching JSON mode before it ships.
+
+## Safety
+
+Current commands issue only `GET` requests. Do not smoke test write, bulk,
+upload, import, email, purge, refund, merge, archive, or delete endpoints against
+an active account.
 
 ## Development
 
@@ -92,6 +114,23 @@ nix build
 nix run . -- --help
 ```
 
+Inside `nix develop`, the devshell menu exposes helper commands:
+
+```text
+build           cargo build (debug)
+build-release   cargo build --release
+check           cargo check
+clippy          cargo clippy -- -D warnings
+fmt             cargo fmt
+fmt-check       cargo fmt --all -- --check
+run-tests       cargo test
+ci-local        run the Rust-side CI sequence
+coverage        cargo llvm-cov summary, or --html for a report
+koban           cargo run -- ...
+koban-help      show koban help
+smoke-statics   safe live GET /api/v1/statics smoke test
+```
+
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on
 both x86_64 and aarch64.
@@ -100,4 +139,4 @@ both x86_64 and aarch64.
 
 The working notes in [docs/invoice-ninja-api.md](docs/invoice-ninja-api.md) are
 grounded in the current Invoice Ninja documentation and should be refreshed
-before adding the first networked commands.
+before adding new networked command groups.
