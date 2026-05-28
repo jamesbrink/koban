@@ -31,7 +31,7 @@ const REQUESTED_WITH: &str = "XMLHttpRequest";
     long_about = "koban is a read-only Invoice Ninja CLI for humans and AI agents.",
     arg_required_else_help = true,
     propagate_version = true,
-    next_line_help = true,
+    term_width = 100,
     after_help = "\
 Examples:
   koban statics --output json
@@ -96,50 +96,50 @@ impl fmt::Display for CompletionShell {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Print account statics such as countries, currencies, and invoice status values
+    /// Show reference data such as countries, currencies, and statuses
     #[command(after_help = "\
 Examples:
   koban statics
   koban statics --output json")]
     Statics,
 
-    /// Read clients
+    /// List, show, and inspect clients
     #[command(subcommand)]
     Clients(ResourceCommand),
 
-    /// Read invoices
+    /// List, show, inspect, and download invoices
     #[command(subcommand)]
     Invoices(InvoiceCommand),
 
-    /// Read payments
+    /// List, show, and inspect payments
     #[command(subcommand)]
     Payments(ResourceCommand),
 
-    /// Read quotes
+    /// List, show, and inspect quotes
     #[command(subcommand)]
     Quotes(ResourceCommand),
 
-    /// Read credits
+    /// List, show, and inspect credits
     #[command(subcommand)]
     Credits(ResourceCommand),
 
-    /// Read vendors
+    /// List, show, and inspect vendors
     #[command(subcommand)]
     Vendors(ResourceCommand),
 
-    /// Read expenses
+    /// List, show, and inspect expenses
     #[command(subcommand)]
     Expenses(ResourceCommand),
 
-    /// Read projects
+    /// List, show, and inspect projects
     #[command(subcommand)]
     Projects(ResourceCommand),
 
-    /// Read tasks
+    /// List, show, and inspect tasks
     #[command(subcommand)]
     Tasks(ResourceCommand),
 
-    /// Update koban from GitHub Releases or print the right package-manager recipe
+    /// Check or install GitHub release updates
     #[command(after_long_help = "\
 Upgrade koban in place when installed from a release tarball. For other install
 sources the command prints the right upgrade recipe and exits:
@@ -169,7 +169,7 @@ command does not hit api.github.com and avoids anonymous API rate limits. Use
         nightly: bool,
     },
 
-    /// Generate shell completions
+    /// Print shell completion scripts
     #[command(after_long_help = "\
 Setup examples:
 
@@ -193,21 +193,21 @@ Setup examples:
 
 #[derive(Debug, Subcommand)]
 pub enum ResourceCommand {
-    /// List records without mutating Invoice Ninja data
+    /// List records with pagination, filters, and sorting
     #[command(after_help = "\
 Examples:
   koban clients list --page 1 --per-page 20
   koban invoices list --include client --output json")]
     List(ListArgs),
 
-    /// Show one record by its Invoice Ninja hashed ID
+    /// Show one record by hashed ID
     #[command(after_help = "\
 Examples:
   koban clients show k9avmeG1P0 --output json
   koban payments show k9avmeG1P0")]
     Show(ShowArgs),
 
-    /// Fetch a blank/default object template with GET /create
+    /// Show the default object template from GET /create
     #[command(
         alias = "blank",
         alias = "new-template",
@@ -218,7 +218,7 @@ Examples:
     )]
     Template(TemplateArgs),
 
-    /// Fetch the editable object template with GET /{id}/edit
+    /// Show the editable object template from GET /{id}/edit
     #[command(
         name = "edit-template",
         alias = "edit-form",
@@ -232,21 +232,21 @@ Examples:
 
 #[derive(Debug, Subcommand)]
 pub enum InvoiceCommand {
-    /// List invoices without mutating Invoice Ninja data
+    /// List invoices with pagination, filters, and sorting
     #[command(after_help = "\
 Examples:
   koban invoices list --page 1 --per-page 20
   koban invoices list --filter status_id=gt:1 --sort 'date|desc' --output json")]
     List(ListArgs),
 
-    /// Show one invoice by its Invoice Ninja hashed ID
+    /// Show one invoice by hashed ID
     #[command(after_help = "\
 Examples:
   koban invoices show k9avmeG1P0 --output json
   koban invoices show k9avmeG1P0 --include client")]
     Show(ShowArgs),
 
-    /// Fetch a blank/default invoice template with GET /create
+    /// Show the default invoice template from GET /create
     #[command(
         alias = "blank",
         alias = "new-template",
@@ -257,7 +257,7 @@ Examples:
     )]
     Template(TemplateArgs),
 
-    /// Fetch the editable invoice template with GET /{id}/edit
+    /// Show the editable invoice template from GET /{id}/edit
     #[command(
         name = "edit-template",
         alias = "edit-form",
@@ -268,14 +268,14 @@ Examples:
     )]
     EditTemplate(ShowArgs),
 
-    /// Download an invoice PDF using its invitation key
+    /// Save an invoice PDF by invitation key
     #[command(after_help = "\
 Examples:
   koban invoices download invitation_key --output-file invoice.pdf
   koban invoices download invitation_key --output-file invoice.pdf --force")]
     Download(DownloadArgs),
 
-    /// Download an invoice delivery note PDF using the invoice hashed ID
+    /// Save a delivery note PDF by invoice ID
     #[command(
         name = "delivery-note",
         after_help = "\

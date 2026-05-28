@@ -22,7 +22,18 @@ fn completions_zsh_outputs_script() {
         .assert()
         .success()
         .stdout(predicate::str::contains("#compdef koban"))
-        .stdout(predicate::str::contains("invoices"));
+        .stdout(predicate::str::contains(
+            "invoices:List, show, inspect, and download invoices",
+        ))
+        .stdout(predicate::str::contains(
+            "quotes:List, show, and inspect quotes",
+        ))
+        .stdout(predicate::str::contains(
+            "download:Save an invoice PDF by invitation key",
+        ))
+        .stdout(predicate::str::contains(
+            "delivery-note:Save a delivery note PDF by invoice ID",
+        ));
 }
 
 #[test]

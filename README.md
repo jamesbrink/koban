@@ -185,6 +185,10 @@ koban-help      show koban help
 smoke-statics   safe live GET /api/v1/statics smoke test
 ```
 
+The devshell also loads `INVOICE_NINJA_API_TOKEN` and
+`INVOICE_NINJA_BASE_URL` from a local gitignored `.env` file when those
+variables are not already set in the shell.
+
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on
 both x86_64 and aarch64.

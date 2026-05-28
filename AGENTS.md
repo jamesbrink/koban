@@ -26,6 +26,8 @@ The Nix devshell intentionally exposes the project helper menu. Keep these
 helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `build-release`, `check`, `clippy`, `fmt`, `fmt-check`, `run-tests`, `ci-local`,
 `coverage`, `koban`, `koban-help`, and `smoke-statics`.
+The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
+the gitignored `.env` file when those variables are not already set.
 
 Release automation lives in `.github/workflows/release-please.yml`. Koban is a
 plain CLI: do not add code signing or notarization unless explicitly requested.

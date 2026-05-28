@@ -143,6 +143,45 @@
               }
             ];
 
+            devshell.startup.load-env = {
+              text = ''
+                if [ -f .env ]; then
+                  koban_load_dotenv_var() {
+                    local key="$1"
+                    local value
+                    value="$(
+                      awk -F= -v key="$key" '
+                        /^[[:space:]]*(#|$)/ { next }
+                        {
+                          raw_key = $1
+                          sub(/^[[:space:]]*/, "", raw_key)
+                          sub(/[[:space:]]*$/, "", raw_key)
+                          if (raw_key != key) { next }
+
+                          value = substr($0, index($0, "=") + 1)
+                          sub(/^[[:space:]]*/, "", value)
+                          sub(/[[:space:]]*$/, "", value)
+                          sub(/\r$/, "", value)
+                          if (substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") {
+                            value = substr(value, 2, length(value) - 2)
+                          }
+                          print value
+                          exit
+                        }
+                      ' .env
+                    )"
+                    if [ -n "$value" ] && [ -z "''${!key:-}" ]; then
+                      export "$key=$value"
+                    fi
+                  }
+
+                  koban_load_dotenv_var INVOICE_NINJA_API_TOKEN
+                  koban_load_dotenv_var INVOICE_NINJA_BASE_URL
+                  unset -f koban_load_dotenv_var
+                fi
+              '';
+            };
+
             commands = [
               {
                 category = "build";

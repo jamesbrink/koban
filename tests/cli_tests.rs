@@ -15,6 +15,12 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Invoice Ninja"))
+        .stdout(predicate::str::contains(
+            "clients      List, show, and inspect clients",
+        ))
+        .stdout(predicate::str::contains(
+            "invoices     List, show, inspect, and download invoices",
+        ))
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
         .stdout(predicate::str::contains("payments"))
@@ -51,7 +57,9 @@ fn resource_help_includes_read_only_template_commands() {
         .args(["invoices", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("\n  template\n"))
+        .stdout(predicate::str::contains(
+            "template       Show the default invoice template",
+        ))
         .stdout(predicate::str::contains("edit-template"))
         .stdout(predicate::str::contains("download"))
         .stdout(predicate::str::contains("delivery-note"));
