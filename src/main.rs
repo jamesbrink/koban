@@ -1,65 +1,59 @@
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::Shell;
+use clap::Parser;
+use clap_complete::{Shell, generate};
+use clap_complete_nushell::Nushell;
+use koban::{Cli, Commands, CompletionShell};
 
-fn main() {
-    clap_complete::CompleteEnv::with_factory(Cli::command).complete();
+#[tokio::main]
+async fn main() {
+    clap_complete::CompleteEnv::with_factory(koban::command).complete();
 
     let cli = Cli::parse();
-    match cli.command {
-        Some(Commands::Completions { shell }) => {
-            let mut command = Cli::command();
-            let bin_name = command.get_name().to_string();
-            clap_complete::generate(shell, &mut command, bin_name, &mut std::io::stdout());
-        }
-        None => {
-            Cli::command().print_help().expect("write help");
-            println!();
+
+    if let Some(Commands::Completions { shell }) = &cli.command {
+        print_completions(shell);
+        return;
+    }
+
+    match koban::execute(cli).await {
+        Ok(output) if output.is_empty() => {}
+        Ok(output) => println!("{output}"),
+        Err(error) => {
+            eprintln!("{:?}", miette::Report::new(error));
+            std::process::exit(1);
         }
     }
 }
 
-#[derive(Debug, Parser)]
-#[command(
-    name = "koban",
-    version,
-    about = "Invoice Ninja from the terminal",
-    long_about = "koban is a Rust CLI for Invoice Ninja, designed for both humans and AI agents.",
-    arg_required_else_help = true
-)]
-struct Cli {
-    /// Output format for commands that return data
-    #[arg(long, value_enum, default_value_t = OutputFormat::Table, global = true)]
-    output: OutputFormat,
+fn print_completions(shell: &CompletionShell) {
+    let mut command = koban::command();
+    let bin_name = command.get_name().to_string();
 
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum OutputFormat {
-    /// Human-readable tables
-    Table,
-    /// Machine-readable JSON
-    Json,
-}
-
-#[derive(Debug, Subcommand)]
-enum Commands {
-    /// Generate shell completions
-    #[command(after_long_help = "\
-Setup examples:
-
-  zsh:
-    source <(koban completions zsh)
-
-  bash:
-    source <(koban completions bash)
-
-  fish:
-    koban completions fish | source")]
-    Completions {
-        /// Shell to generate completions for
-        #[arg(value_enum)]
-        shell: Shell,
-    },
+    match shell {
+        CompletionShell::Bash => {
+            generate(Shell::Bash, &mut command, bin_name, &mut std::io::stdout())
+        }
+        CompletionShell::Elvish => generate(
+            Shell::Elvish,
+            &mut command,
+            bin_name,
+            &mut std::io::stdout(),
+        ),
+        CompletionShell::Fish => {
+            generate(Shell::Fish, &mut command, bin_name, &mut std::io::stdout())
+        }
+        CompletionShell::PowerShell => {
+            generate(
+                Shell::PowerShell,
+                &mut command,
+                bin_name,
+                &mut std::io::stdout(),
+            );
+        }
+        CompletionShell::Zsh => {
+            generate(Shell::Zsh, &mut command, bin_name, &mut std::io::stdout())
+        }
+        CompletionShell::Nushell => {
+            generate(Nushell, &mut command, bin_name, &mut std::io::stdout());
+        }
+    }
 }
