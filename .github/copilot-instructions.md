@@ -20,9 +20,16 @@ is intentionally a symlink to `AGENTS.md`; do not replace it with a copied file.
 
 ## Safety
 
-The implemented Invoice Ninja API commands must remain read-only unless explicitly requested for write support. Do not add or smoke test destructive, write,
-bulk, upload, import, email, purge, refund, merge, archive, or delete flows
-against an active account. Prefer mocked API tests for command behavior.
+The implemented Invoice Ninja API commands must remain read-only unless
+explicitly requested for write support. Invoice download commands may save PDF
+bytes to explicit local paths, but must still use `GET`.
+
+Prefer the public demo API for read-only live smoke tests:
+`INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
+`INVOICE_NINJA_API_TOKEN=TOKEN`. Do not add or smoke test destructive, write,
+bulk, upload, import, email, purge, refund, merge, archive, or delete flows in
+any environment unless write support has been explicitly implemented and
+reviewed. Prefer mocked API tests for command behavior.
 
 Use `INVOICE_NINJA_API_TOKEN` and optional `INVOICE_NINJA_BASE_URL` for config.
 Redact tokens from errors, traces, fixtures, and docs.

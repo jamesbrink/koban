@@ -7,7 +7,7 @@ shell completions.
 
 The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
 still early work: the CLI boots, reports its version, generates shell
-completions, and exposes a small read-only Invoice Ninja API surface.
+completions, and exposes a growing read-only Invoice Ninja API surface.
 
 ## Install
 
@@ -48,7 +48,7 @@ koban completions fish
 koban completions nushell
 ```
 
-The first API commands are read-only and use `GET` requests only:
+The implemented API commands are read-only and use `GET` requests only:
 
 ```sh
 koban statics --output json
@@ -57,20 +57,49 @@ koban clients show <id> --output json
 koban clients template --output json
 koban clients edit-template <id> --output json
 koban invoices list
+koban invoices list --filter status_id=gt:1 --sort 'date|desc' --all --limit 50
 koban invoices show <id>
 koban invoices template --output json
 koban invoices edit-template <id> --output json
+koban invoices download <invitation_key> --output-file invoice.pdf
+koban invoices delivery-note <id> --output-file delivery-note.pdf
 koban payments list
 koban payments show <id>
 koban payments template --output json
 koban payments edit-template <id> --output json
+koban quotes list
+koban quotes show <id>
+koban quotes template --output json
+koban quotes edit-template <id> --output json
+koban credits list
+koban credits show <id>
+koban credits template --output json
+koban credits edit-template <id> --output json
+koban vendors list
+koban vendors show <id>
+koban vendors template --output json
+koban vendors edit-template <id> --output json
+koban expenses list
+koban expenses show <id>
+koban expenses template --output json
+koban expenses edit-template <id> --output json
+koban projects list
+koban projects show <id>
+koban projects template --output json
+koban projects edit-template <id> --output json
+koban tasks list
+koban tasks show <id>
+koban tasks template --output json
+koban tasks edit-template <id> --output json
 ```
 
 ## Invoice Ninja Direction
 
 Invoice Ninja v5 exposes an API under `/api/v1`. Hosted production is
 `https://invoicing.co`, and self-hosted installs use the same namespace under
-their own base URL.
+their own base URL. Invoice Ninja also provides a public demo API at
+`https://demo.invoiceninja.com` with the demo token `TOKEN`; use that target for
+read-only live smoke tests whenever possible.
 
 Authentication is token based. Requests require `X-API-TOKEN`, and the developer
 guide also documents `X-Requested-With: XMLHttpRequest` as a required security
@@ -92,11 +121,45 @@ koban payments list
 koban payments show <id>
 koban payments template
 koban payments edit-template <id>
+koban quotes list
+koban quotes show <id>
+koban quotes template
+koban quotes edit-template <id>
+koban credits list
+koban credits show <id>
+koban credits template
+koban credits edit-template <id>
+koban vendors list
+koban vendors show <id>
+koban vendors template
+koban vendors edit-template <id>
+koban expenses list
+koban expenses show <id>
+koban expenses template
+koban expenses edit-template <id>
+koban projects list
+koban projects show <id>
+koban projects template
+koban projects edit-template <id>
+koban tasks list
+koban tasks show <id>
+koban tasks template
+koban tasks edit-template <id>
 ```
 
 The `template` and `edit-template` commands use Invoice Ninja's read-only
 `GET /create` and `GET /{id}/edit` routes. They return default/editable payloads
 for schema discovery; they do not create or update records.
+
+List commands accept raw Invoice Ninja query filters and sorting:
+
+```sh
+koban clients list --filter balance=gt:1000 --filter name=Bob --sort 'name|desc'
+koban invoices list --all --limit 100 --output json
+```
+
+Invoice download commands also use read-only `GET` routes and write PDF bytes to
+explicit file paths. Existing files are not overwritten unless `--force` is set.
 
 Future creation and update commands should grow around explicit files or
 stdin-first JSON so agent workflows do not depend on prompts.
@@ -114,11 +177,21 @@ export INVOICE_NINJA_API_TOKEN="..."
 Tokens must never be printed by default, and human-facing output should have a
 matching JSON mode before it ships.
 
+For demo-only read smoke tests:
+
+```sh
+export INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
+export INVOICE_NINJA_API_TOKEN="TOKEN"
+```
+
 ## Safety
 
-Current commands issue only `GET` requests. Do not smoke test write, bulk,
-upload, import, email, purge, refund, merge, archive, or delete endpoints against
-an active account.
+Current commands issue only `GET` requests. Read-only live smoke tests should use
+the public demo endpoint above by default. Do not smoke test write, bulk, upload,
+import, email, purge, refund, merge, archive, or delete endpoints against any
+environment unless write support has been explicitly implemented and reviewed.
+Production or personal accounts should only be used for intentional,
+non-destructive reads.
 
 ## Development
 
@@ -157,6 +230,16 @@ coverage        cargo llvm-cov summary, or --html for a report
 koban           cargo run -- ...
 koban-help      show koban help
 smoke-statics   safe live GET /api/v1/statics smoke test
+```
+
+The devshell also loads `INVOICE_NINJA_API_TOKEN` and
+`INVOICE_NINJA_BASE_URL` from a local gitignored `.env` file when those
+variables are not already set in the shell. For routine live smoke testing, use
+the demo values:
+
+```dotenv
+INVOICE_NINJA_API_TOKEN=TOKEN
+INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com
 ```
 
 The flake exports `packages.default`, `packages.koban`, `apps.default`,

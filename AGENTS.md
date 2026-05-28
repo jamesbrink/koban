@@ -11,8 +11,16 @@ Koban is an early Rust CLI for Invoice Ninja. Keep the current implemented API
 surface read-only unless explicitly requested for write support:
 
 - Use only `GET` requests in CLI commands.
+- Invoice download commands may write PDF bytes to explicit local file paths,
+  but they must still use read-only `GET` endpoints.
+- Prefer the public Invoice Ninja demo endpoint for read-only live smoke tests:
+  `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
+  `INVOICE_NINJA_API_TOKEN=TOKEN`.
 - Do not smoke test destructive, write, bulk, upload, import, email, purge,
-  refund, merge, archive, or delete endpoints against an active account.
+  refund, merge, archive, or delete endpoints against any environment unless
+  write support has been explicitly implemented and reviewed.
+- Use production or personal accounts only for intentional, non-destructive read
+  checks.
 - Keep token handling environment-first with `INVOICE_NINJA_API_TOKEN` and
   optional `INVOICE_NINJA_BASE_URL`.
 - Redact tokens in errors, traces, fixtures, and docs.
@@ -24,6 +32,8 @@ The Nix devshell intentionally exposes the project helper menu. Keep these
 helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `build-release`, `check`, `clippy`, `fmt`, `fmt-check`, `run-tests`, `ci-local`,
 `coverage`, `koban`, `koban-help`, and `smoke-statics`.
+The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
+the gitignored `.env` file when those variables are not already set.
 
 Release automation lives in `.github/workflows/release-please.yml`. Koban is a
 plain CLI: do not add code signing or notarization unless explicitly requested.

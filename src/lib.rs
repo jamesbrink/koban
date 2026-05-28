@@ -3,14 +3,17 @@
 //! The public surface is intentionally small while the CLI and Invoice Ninja
 //! client model settle.
 
-use std::{env, fmt};
+use std::{
+    env, fmt, fs,
+    path::{Path, PathBuf},
+};
 
 mod update;
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use miette::Diagnostic;
 use reqwest::StatusCode;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tabled::{Table, Tabled, settings::Style};
 use thiserror::Error;
 use url::Url;
@@ -28,12 +31,13 @@ const REQUESTED_WITH: &str = "XMLHttpRequest";
     long_about = "koban is a read-only Invoice Ninja CLI for humans and AI agents.",
     arg_required_else_help = true,
     propagate_version = true,
-    next_line_help = true,
+    term_width = 100,
     after_help = "\
 Examples:
   koban statics --output json
   koban clients list --page 1 --per-page 20
   koban clients show <client_id> --output json
+  koban invoices download <invitation_key> --output-file invoice.pdf
   koban invoices template --output json
   koban invoices edit-template <invoice_id> --output json
   koban update --check
@@ -92,26 +96,50 @@ impl fmt::Display for CompletionShell {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Print account statics such as countries, currencies, and invoice status values
+    /// Show reference data such as countries, currencies, and statuses
     #[command(after_help = "\
 Examples:
   koban statics
   koban statics --output json")]
     Statics,
 
-    /// Read clients
+    /// List, show, and inspect clients
     #[command(subcommand)]
     Clients(ResourceCommand),
 
-    /// Read invoices
+    /// List, show, inspect, and download invoices
     #[command(subcommand)]
-    Invoices(ResourceCommand),
+    Invoices(InvoiceCommand),
 
-    /// Read payments
+    /// List, show, and inspect payments
     #[command(subcommand)]
     Payments(ResourceCommand),
 
-    /// Update koban from GitHub Releases or print the right package-manager recipe
+    /// List, show, and inspect quotes
+    #[command(subcommand)]
+    Quotes(ResourceCommand),
+
+    /// List, show, and inspect credits
+    #[command(subcommand)]
+    Credits(ResourceCommand),
+
+    /// List, show, and inspect vendors
+    #[command(subcommand)]
+    Vendors(ResourceCommand),
+
+    /// List, show, and inspect expenses
+    #[command(subcommand)]
+    Expenses(ResourceCommand),
+
+    /// List, show, and inspect projects
+    #[command(subcommand)]
+    Projects(ResourceCommand),
+
+    /// List, show, and inspect tasks
+    #[command(subcommand)]
+    Tasks(ResourceCommand),
+
+    /// Check or install GitHub release updates
     #[command(after_long_help = "\
 Upgrade koban in place when installed from a release tarball. For other install
 sources the command prints the right upgrade recipe and exits:
@@ -141,7 +169,7 @@ command does not hit api.github.com and avoids anonymous API rate limits. Use
         nightly: bool,
     },
 
-    /// Generate shell completions
+    /// Print shell completion scripts
     #[command(after_long_help = "\
 Setup examples:
 
@@ -165,21 +193,21 @@ Setup examples:
 
 #[derive(Debug, Subcommand)]
 pub enum ResourceCommand {
-    /// List records without mutating Invoice Ninja data
+    /// List records with pagination, filters, and sorting
     #[command(after_help = "\
 Examples:
   koban clients list --page 1 --per-page 20
   koban invoices list --include client --output json")]
     List(ListArgs),
 
-    /// Show one record by its Invoice Ninja hashed ID
+    /// Show one record by hashed ID
     #[command(after_help = "\
 Examples:
   koban clients show k9avmeG1P0 --output json
   koban payments show k9avmeG1P0")]
     Show(ShowArgs),
 
-    /// Fetch a blank/default object template with GET /create
+    /// Show the default object template from GET /create
     #[command(
         alias = "blank",
         alias = "new-template",
@@ -190,7 +218,7 @@ Examples:
     )]
     Template(TemplateArgs),
 
-    /// Fetch the editable object template with GET /{id}/edit
+    /// Show the editable object template from GET /{id}/edit
     #[command(
         name = "edit-template",
         alias = "edit-form",
@@ -200,6 +228,62 @@ Examples:
   koban payments edit-template k9avmeG1P0"
     )]
     EditTemplate(ShowArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum InvoiceCommand {
+    /// List invoices with pagination, filters, and sorting
+    #[command(after_help = "\
+Examples:
+  koban invoices list --page 1 --per-page 20
+  koban invoices list --filter status_id=gt:1 --sort 'date|desc' --output json")]
+    List(ListArgs),
+
+    /// Show one invoice by hashed ID
+    #[command(after_help = "\
+Examples:
+  koban invoices show k9avmeG1P0 --output json
+  koban invoices show k9avmeG1P0 --include client")]
+    Show(ShowArgs),
+
+    /// Show the default invoice template from GET /create
+    #[command(
+        alias = "blank",
+        alias = "new-template",
+        after_help = "\
+Examples:
+  koban invoices template --output json
+  koban invoices template --include client --output json"
+    )]
+    Template(TemplateArgs),
+
+    /// Show the editable invoice template from GET /{id}/edit
+    #[command(
+        name = "edit-template",
+        alias = "edit-form",
+        after_help = "\
+Examples:
+  koban invoices edit-template k9avmeG1P0 --output json
+  koban invoices edit-template k9avmeG1P0 --include client"
+    )]
+    EditTemplate(ShowArgs),
+
+    /// Save an invoice PDF by invitation key
+    #[command(after_help = "\
+Examples:
+  koban invoices download invitation_key --output-file invoice.pdf
+  koban invoices download invitation_key --output-file invoice.pdf --force")]
+    Download(DownloadArgs),
+
+    /// Save a delivery note PDF by invoice ID
+    #[command(
+        name = "delivery-note",
+        after_help = "\
+Examples:
+  koban invoices delivery-note k9avmeG1P0 --output-file delivery-note.pdf
+  koban invoices delivery-note k9avmeG1P0 --output-file delivery-note.pdf --force"
+    )]
+    DeliveryNote(DownloadArgs),
 }
 
 #[derive(Debug, Args)]
@@ -215,6 +299,22 @@ pub struct ListArgs {
     /// Related resources to include, comma-separated; repeatable
     #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
     pub include: Vec<String>,
+
+    /// Raw Invoice Ninja filter in key=value form; repeatable
+    #[arg(long = "filter", value_name = "key=value", action = clap::ArgAction::Append)]
+    pub filters: Vec<String>,
+
+    /// Raw Invoice Ninja sort expression, such as name|asc or date|desc
+    #[arg(long, value_name = "field|asc")]
+    pub sort: Option<String>,
+
+    /// Fetch pages until the API returns fewer rows than requested
+    #[arg(long)]
+    pub all: bool,
+
+    /// Maximum number of rows to emit
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Args)]
@@ -234,11 +334,35 @@ pub struct TemplateArgs {
     pub include: Vec<String>,
 }
 
+#[derive(Debug, Args)]
+pub struct DownloadArgs {
+    /// Invoice invitation key for `download`, or invoice hashed ID for `delivery-note`
+    pub id: String,
+
+    /// File path to write the downloaded PDF to
+    #[arg(long = "output-file", short = 'o', value_name = "PATH")]
+    pub output_file: PathBuf,
+
+    /// Overwrite the output file if it already exists
+    #[arg(long)]
+    pub force: bool,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Resource {
     Clients,
     Invoices,
     Payments,
+    Quotes,
+    Credits,
+    Vendors,
+    Expenses,
+    Projects,
+    Tasks,
 }
 
 impl Resource {
@@ -247,6 +371,12 @@ impl Resource {
             Self::Clients => "clients",
             Self::Invoices => "invoices",
             Self::Payments => "payments",
+            Self::Quotes => "quotes",
+            Self::Credits => "credits",
+            Self::Vendors => "vendors",
+            Self::Expenses => "expenses",
+            Self::Projects => "projects",
+            Self::Tasks => "tasks",
         }
     }
 }
@@ -343,6 +473,16 @@ pub enum KobanError {
     #[error("Invoice Ninja returned a response Koban could not decode: {message}")]
     Decode { message: String },
 
+    #[error("list filter is not valid: {value}")]
+    #[diagnostic(help("Use key=value, for example `--filter balance=gt:1000`."))]
+    InvalidFilter { value: String },
+
+    #[error("could not write download file: {message}")]
+    #[diagnostic(help(
+        "Choose a path in an existing directory. Use --force if you intentionally want to overwrite an existing file."
+    ))]
+    File { message: String },
+
     #[error("update failed: {message}")]
     #[diagnostic(help(
         "Run `koban update --check` to inspect the latest release without modifying the installed binary."
@@ -365,7 +505,7 @@ impl ApiClient {
         }
     }
 
-    pub fn endpoint(&self, path: &str, query: &[(&str, String)]) -> Result<Url> {
+    pub fn endpoint(&self, path: &str, query: &[(String, String)]) -> Result<Url> {
         let mut url = self
             .config
             .base_url
@@ -376,14 +516,17 @@ impl ApiClient {
             })?;
 
         if !query.is_empty() {
-            url.query_pairs_mut()
-                .extend_pairs(query.iter().map(|(key, value)| (*key, value.as_str())));
+            url.query_pairs_mut().extend_pairs(
+                query
+                    .iter()
+                    .map(|(key, value)| (key.as_str(), value.as_str())),
+            );
         }
 
         Ok(url)
     }
 
-    pub async fn get_json(&self, path: &str, query: &[(&str, String)]) -> Result<Value> {
+    pub async fn get_json(&self, path: &str, query: &[(String, String)]) -> Result<Value> {
         let url = self.endpoint(path, query)?;
         let endpoint = endpoint_label(&url);
         let response = self
@@ -409,6 +552,36 @@ impl ApiClient {
         serde_json::from_str(&body).map_err(|source| KobanError::Decode {
             message: redact(source.to_string(), &self.config.api_token),
         })
+    }
+
+    pub async fn get_bytes(&self, path: &str, query: &[(String, String)]) -> Result<Vec<u8>> {
+        let url = self.endpoint(path, query)?;
+        let endpoint = endpoint_label(&url);
+        let response = self
+            .http
+            .get(url)
+            .header("X-API-TOKEN", &self.config.api_token)
+            .header("X-Requested-With", REQUESTED_WITH)
+            .send()
+            .await
+            .map_err(|source| KobanError::Transport {
+                message: redact(source.to_string(), &self.config.api_token),
+            })?;
+
+        let status = response.status();
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|source| KobanError::Decode {
+                message: redact(source.to_string(), &self.config.api_token),
+            })?;
+
+        if status.is_success() {
+            Ok(bytes.to_vec())
+        } else {
+            let body = String::from_utf8_lossy(&bytes).to_string();
+            Err(api_error(status, endpoint, body, &self.config.api_token))
+        }
     }
 }
 
@@ -442,11 +615,27 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Clients(command)) => {
             execute_resource(&client, output, Resource::Clients, command).await
         }
-        Some(Commands::Invoices(command)) => {
-            execute_resource(&client, output, Resource::Invoices, command).await
-        }
+        Some(Commands::Invoices(command)) => execute_invoice(&client, output, command).await,
         Some(Commands::Payments(command)) => {
             execute_resource(&client, output, Resource::Payments, command).await
+        }
+        Some(Commands::Quotes(command)) => {
+            execute_resource(&client, output, Resource::Quotes, command).await
+        }
+        Some(Commands::Credits(command)) => {
+            execute_resource(&client, output, Resource::Credits, command).await
+        }
+        Some(Commands::Vendors(command)) => {
+            execute_resource(&client, output, Resource::Vendors, command).await
+        }
+        Some(Commands::Expenses(command)) => {
+            execute_resource(&client, output, Resource::Expenses, command).await
+        }
+        Some(Commands::Projects(command)) => {
+            execute_resource(&client, output, Resource::Projects, command).await
+        }
+        Some(Commands::Tasks(command)) => {
+            execute_resource(&client, output, Resource::Tasks, command).await
         }
         Some(Commands::Update {
             check,
@@ -465,18 +654,7 @@ async fn execute_resource(
     command: ResourceCommand,
 ) -> Result<String> {
     match command {
-        ResourceCommand::List(args) => {
-            let mut query = vec![
-                ("page", args.page.to_string()),
-                ("per_page", args.per_page.to_string()),
-            ];
-            push_include(&mut query, args.include);
-
-            let json = client
-                .get_json(&format!("api/v1/{}", resource.path()), &query)
-                .await?;
-            render_value(output, Some(resource), &json)
-        }
+        ResourceCommand::List(args) => execute_list(client, output, resource, args).await,
         ResourceCommand::Show(args) => {
             let mut query = Vec::new();
             push_include(&mut query, args.include);
@@ -510,7 +688,179 @@ async fn execute_resource(
     }
 }
 
-fn push_include(query: &mut Vec<(&str, String)>, include: Vec<String>) {
+async fn execute_invoice(
+    client: &ApiClient,
+    output: OutputFormat,
+    command: InvoiceCommand,
+) -> Result<String> {
+    match command {
+        InvoiceCommand::List(args) => execute_list(client, output, Resource::Invoices, args).await,
+        InvoiceCommand::Show(args) => {
+            execute_resource(
+                client,
+                output,
+                Resource::Invoices,
+                ResourceCommand::Show(args),
+            )
+            .await
+        }
+        InvoiceCommand::Template(args) => {
+            execute_resource(
+                client,
+                output,
+                Resource::Invoices,
+                ResourceCommand::Template(args),
+            )
+            .await
+        }
+        InvoiceCommand::EditTemplate(args) => {
+            execute_resource(
+                client,
+                output,
+                Resource::Invoices,
+                ResourceCommand::EditTemplate(args),
+            )
+            .await
+        }
+        InvoiceCommand::Download(args) => {
+            execute_download(client, "api/v1/invoice", "download", args).await
+        }
+        InvoiceCommand::DeliveryNote(args) => {
+            execute_download(client, "api/v1/invoices", "delivery_note", args).await
+        }
+    }
+}
+
+async fn execute_list(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: ListArgs,
+) -> Result<String> {
+    let mut base_query = Vec::new();
+    push_include(&mut base_query, args.include);
+    push_sort(&mut base_query, args.sort);
+    push_filters(&mut base_query, args.filters)?;
+
+    if !args.all {
+        let mut query = base_query;
+        query.push(("page".to_string(), args.page.to_string()));
+        query.push(("per_page".to_string(), args.per_page.to_string()));
+
+        let json = client
+            .get_json(&format!("api/v1/{}", resource.path()), &query)
+            .await?;
+        let json = apply_limit_to_response(json, args.limit);
+        return render_value(output, Some(resource), &json);
+    }
+
+    let json = fetch_all_pages(
+        client,
+        resource,
+        &base_query,
+        args.page,
+        args.per_page,
+        args.limit,
+    )
+    .await?;
+    render_value(output, Some(resource), &json)
+}
+
+async fn execute_download(
+    client: &ApiClient,
+    base_path: &str,
+    action: &str,
+    args: DownloadArgs,
+) -> Result<String> {
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    ensure_download_path(&args.output_file, args.force)?;
+    write_download_file(
+        &args.output_file,
+        client
+            .get_bytes(&format!("{base_path}/{}/{action}", args.id), &query)
+            .await?,
+        args.force,
+    )?;
+    Ok(format!("Wrote {}", args.output_file.display()))
+}
+
+async fn fetch_all_pages(
+    client: &ApiClient,
+    resource: Resource,
+    base_query: &[(String, String)],
+    start_page: u32,
+    per_page: u32,
+    limit: Option<u32>,
+) -> Result<Value> {
+    let mut page = start_page;
+    let mut pages_fetched = 0_u32;
+    let mut rows = Vec::new();
+
+    loop {
+        let mut query = base_query.to_vec();
+        query.push(("page".to_string(), page.to_string()));
+        query.push(("per_page".to_string(), per_page.to_string()));
+
+        let json = client
+            .get_json(&format!("api/v1/{}", resource.path()), &query)
+            .await?;
+        let page_rows = response_rows(&json)
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let page_len = page_rows.len();
+        pages_fetched += 1;
+
+        for row in page_rows {
+            if limit.is_some_and(|limit| rows.len() >= limit as usize) {
+                break;
+            }
+            rows.push(row);
+        }
+
+        if page_len < per_page as usize || limit.is_some_and(|limit| rows.len() >= limit as usize) {
+            break;
+        }
+        page += 1;
+    }
+
+    Ok(json!({
+        "data": rows,
+        "meta": {
+            "pages_fetched": pages_fetched,
+            "limit": limit,
+        }
+    }))
+}
+
+fn write_download_file(path: &Path, bytes: Vec<u8>, force: bool) -> Result<()> {
+    ensure_download_path(path, force)?;
+    fs::write(path, bytes).map_err(|source| KobanError::File {
+        message: source.to_string(),
+    })
+}
+
+fn ensure_download_path(path: &Path, force: bool) -> Result<()> {
+    if path.exists() && !force {
+        return Err(KobanError::File {
+            message: format!("{} already exists", path.display()),
+        });
+    }
+
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+    {
+        return Err(KobanError::File {
+            message: format!("parent directory {} does not exist", parent.display()),
+        });
+    }
+
+    Ok(())
+}
+
+fn push_include(query: &mut Vec<(String, String)>, include: Vec<String>) {
     let include = include
         .into_iter()
         .map(|part| part.trim().to_string())
@@ -518,8 +868,46 @@ fn push_include(query: &mut Vec<(&str, String)>, include: Vec<String>) {
         .collect::<Vec<_>>();
 
     if !include.is_empty() {
-        query.push(("include", include.join(",")));
+        query.push(("include".to_string(), include.join(",")));
     }
+}
+
+fn push_sort(query: &mut Vec<(String, String)>, sort: Option<String>) {
+    if let Some(sort) = sort
+        .map(|sort| sort.trim().to_string())
+        .filter(|sort| !sort.is_empty())
+    {
+        query.push(("sort".to_string(), sort));
+    }
+}
+
+fn push_filters(query: &mut Vec<(String, String)>, filters: Vec<String>) -> Result<()> {
+    for filter in filters {
+        let Some((key, value)) = filter.split_once('=') else {
+            return Err(KobanError::InvalidFilter { value: filter });
+        };
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(KobanError::InvalidFilter { value: filter });
+        }
+        query.push((key.to_string(), value.trim().to_string()));
+    }
+    Ok(())
+}
+
+fn apply_limit_to_response(mut value: Value, limit: Option<u32>) -> Value {
+    let Some(limit) = limit else {
+        return value;
+    };
+    let limit = limit as usize;
+
+    if let Some(Value::Array(items)) = value.get_mut("data") {
+        items.truncate(limit);
+    } else if let Some(items) = value.as_array_mut() {
+        items.truncate(limit);
+    }
+
+    value
 }
 
 pub fn render_value(
@@ -549,6 +937,12 @@ fn render_table(resource: Option<Resource>, value: &Value) -> String {
                 Resource::Clients => Row::client(item),
                 Resource::Invoices => Row::invoice(item),
                 Resource::Payments => Row::payment(item),
+                Resource::Quotes => Row::quote(item),
+                Resource::Credits => Row::credit(item),
+                Resource::Vendors => Row::vendor(item),
+                Resource::Expenses => Row::expense(item),
+                Resource::Projects => Row::project(item),
+                Resource::Tasks => Row::task(item),
             },
         )
         .collect::<Vec<_>>();
@@ -687,6 +1081,109 @@ impl Row {
             date: first_date_field(value, &[&["date"], &["created_at"]]),
         }
     }
+
+    fn quote(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number"]),
+            name: first_field(
+                value,
+                &[
+                    &["client", "display_name"],
+                    &["client", "name"],
+                    &["client_id"],
+                ],
+            ),
+            status: quote_status(value),
+            amount: field(value, &["amount"]),
+            balance: dash(),
+            date: first_date_field(value, &[&["due_date"], &["date"], &["created_at"]]),
+        }
+    }
+
+    fn credit(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number"]),
+            name: first_field(
+                value,
+                &[
+                    &["client", "display_name"],
+                    &["client", "name"],
+                    &["client_id"],
+                ],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: field(value, &["amount"]),
+            balance: field(value, &["balance"]),
+            date: first_date_field(value, &[&["date"], &["created_at"]]),
+        }
+    }
+
+    fn vendor(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number", "vendor_number"]),
+            name: first_field(
+                value,
+                &[&["display_name"], &["name"], &["contacts", "0", "email"]],
+            ),
+            status: field(value, &["status"]),
+            amount: dash(),
+            balance: field(value, &["balance"]),
+            date: date_field(value, &["created_at"]),
+        }
+    }
+
+    fn expense(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number", "transaction_id"]),
+            name: first_field(
+                value,
+                &[
+                    &["vendor", "display_name"],
+                    &["client", "display_name"],
+                    &["category", "name"],
+                    &["description"],
+                ],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: field(value, &["amount"]),
+            balance: dash(),
+            date: first_date_field(value, &[&["date"], &["created_at"]]),
+        }
+    }
+
+    fn project(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number"]),
+            name: first_field(
+                value,
+                &[&["name"], &["client", "display_name"], &["client_id"]],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: field(value, &["budgeted_hours"]),
+            balance: dash(),
+            date: first_date_field(value, &[&["due_date"], &["created_at"]]),
+        }
+    }
+
+    fn task(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number"]),
+            name: first_field(
+                value,
+                &[&["description"], &["project", "name"], &["client_id"]],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: field(value, &["time"]),
+            balance: dash(),
+            date: first_date_field(value, &[&["date"], &["created_at"]]),
+        }
+    }
 }
 
 fn invoice_status(value: &Value) -> String {
@@ -699,6 +1196,16 @@ fn invoice_status(value: &Value) -> String {
         Some(6) => "reversed".to_string(),
         Some(-1) => "overdue".to_string(),
         Some(-2) => "unpaid".to_string(),
+        _ => first_field(value, &[&["status"], &["status_id"]]),
+    }
+}
+
+fn quote_status(value: &Value) -> String {
+    match value.get("status_id").and_then(Value::as_i64) {
+        Some(1) => "draft".to_string(),
+        Some(2) => "sent".to_string(),
+        Some(3) => "approved".to_string(),
+        Some(4) => "converted".to_string(),
         _ => first_field(value, &[&["status"], &["status_id"]]),
     }
 }
@@ -938,9 +1445,9 @@ mod tests {
             .endpoint(
                 "api/v1/clients",
                 &[
-                    ("page", "2".to_string()),
-                    ("per_page", "15".to_string()),
-                    ("include", "activities,ledger".to_string()),
+                    ("page".to_string(), "2".to_string()),
+                    ("per_page".to_string(), "15".to_string()),
+                    ("include".to_string(), "activities,ledger".to_string()),
                 ],
             )
             .expect("url");
@@ -1074,6 +1581,120 @@ mod tests {
     }
 
     #[test]
+    fn table_output_renders_new_read_only_resources() {
+        let cases = [
+            (
+                Resource::Quotes,
+                serde_json::json!({
+                    "data": [{
+                        "id": "quote_1",
+                        "number": "Q-1",
+                        "client": {"name": "Quote Client"},
+                        "status_id": 3,
+                        "amount": 120,
+                        "due_date": 1772323200_i64
+                    }]
+                }),
+                ["Quote Client", "approved", "2026-03-01"],
+            ),
+            (
+                Resource::Credits,
+                serde_json::json!({
+                    "data": [{
+                        "id": "credit_1",
+                        "number": "C-1",
+                        "client_id": "client_1",
+                        "status": "open",
+                        "amount": 50,
+                        "balance": 10,
+                        "date": "2026-03-02"
+                    }]
+                }),
+                ["client_1", "open", "2026-03-02"],
+            ),
+            (
+                Resource::Vendors,
+                serde_json::json!({
+                    "data": [{
+                        "id": "vendor_1",
+                        "vendor_number": "V-1",
+                        "contacts": [{"email": "vendor@example.test"}],
+                        "balance": 9,
+                        "created_at": 1772496000_i64
+                    }]
+                }),
+                ["vendor@example.test", "9", "2026-03-03"],
+            ),
+            (
+                Resource::Expenses,
+                serde_json::json!({
+                    "data": [{
+                        "id": "expense_1",
+                        "transaction_id": "TX-1",
+                        "category": {"name": "Travel"},
+                        "status_id": "logged",
+                        "amount": 33,
+                        "date": "2026-03-04"
+                    }]
+                }),
+                ["Travel", "logged", "2026-03-04"],
+            ),
+            (
+                Resource::Projects,
+                serde_json::json!({
+                    "data": [{
+                        "id": "project_1",
+                        "number": "P-1",
+                        "name": "Build Koban",
+                        "status": "active",
+                        "budgeted_hours": 12,
+                        "due_date": "2026-03-05"
+                    }]
+                }),
+                ["Build Koban", "active", "2026-03-05"],
+            ),
+            (
+                Resource::Tasks,
+                serde_json::json!({
+                    "data": [{
+                        "id": "task_1",
+                        "number": "T-1",
+                        "project": {"name": "Build Koban"},
+                        "status": "running",
+                        "time": 45,
+                        "date": "2026-03-06"
+                    }]
+                }),
+                ["Build Koban", "running", "2026-03-06"],
+            ),
+        ];
+
+        for (resource, value, expected_parts) in cases {
+            let output = render_value(OutputFormat::Table, Some(resource), &value).expect("table");
+            for expected in expected_parts {
+                assert!(output.contains(expected), "missing {expected}: {output}");
+            }
+        }
+    }
+
+    #[test]
+    fn quote_status_maps_known_statuses_and_fallbacks() {
+        let cases = [(1, "draft"), (2, "sent"), (3, "approved"), (4, "converted")];
+
+        for (status, expected) in cases {
+            assert_eq!(
+                quote_status(&serde_json::json!({"status_id": status})),
+                expected
+            );
+        }
+
+        assert_eq!(
+            quote_status(&serde_json::json!({"status": "custom quote"})),
+            "custom quote"
+        );
+    }
+
+    #[test]
     fn invoice_status_maps_all_known_statuses_and_fallbacks() {
         let cases = [
             (1, "draft"),
@@ -1143,6 +1764,10 @@ mod tests {
         assert_eq!(date_field(&value, &["legacy_millis"]), "2000-01-01");
         assert_eq!(date_field(&value, &["date"]), "2026-05-16");
         assert_eq!(date_field(&value, &["missing"]), "-");
+        assert_eq!(
+            date_field(&serde_json::json!({"date": true}), &["date"]),
+            "true"
+        );
     }
 
     #[test]
@@ -1154,6 +1779,18 @@ mod tests {
         assert_eq!(response_rows(&serde_json::json!([{"id": "one"}])).len(), 1);
         assert_eq!(response_rows(&serde_json::json!({"id": "one"})).len(), 1);
         assert_eq!(response_rows(&serde_json::json!(null)).len(), 0);
+    }
+
+    #[test]
+    fn apply_limit_truncates_array_responses() {
+        let output = apply_limit_to_response(
+            serde_json::json!([
+                {"id": "one"},
+                {"id": "two"}
+            ]),
+            Some(1),
+        );
+        assert_eq!(response_rows(&output).len(), 1);
     }
 
     #[test]
@@ -1216,6 +1853,53 @@ mod tests {
         let message = error.to_string();
         assert!(matches!(error, KobanError::Transport { .. }));
         assert!(!message.contains("secret-token"), "got: {message}");
+    }
+
+    #[tokio::test]
+    async fn get_bytes_reports_api_and_transport_errors() {
+        let server = MockServer::start();
+        let failing_download = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/invoice/invitation/download");
+            then.status(404)
+                .body(r#"{"message":"missing secret-token"}"#);
+        });
+
+        let client =
+            ApiClient::new(Config::from_values(server.base_url(), "secret-token").expect("config"));
+        let error = client
+            .get_bytes("api/v1/invoice/invitation/download", &[])
+            .await
+            .expect_err("api failure");
+        let message = error.to_string();
+        assert!(matches!(error, KobanError::Api { .. }));
+        assert!(message.contains("[REDACTED]"), "got: {message}");
+        assert!(!message.contains("secret-token"), "got: {message}");
+        failing_download.assert();
+
+        let client = ApiClient::new(
+            Config::from_values("http://127.0.0.1:9", "secret-token").expect("config"),
+        );
+        let error = client
+            .get_bytes("api/v1/invoice/invitation/download", &[])
+            .await
+            .expect_err("transport failure");
+        assert!(matches!(error, KobanError::Transport { .. }));
+    }
+
+    #[test]
+    fn download_path_requires_existing_parent_and_force_for_overwrite() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let existing = tempdir.path().join("invoice.pdf");
+        std::fs::write(&existing, b"old").expect("seed file");
+
+        let error = ensure_download_path(&existing, false).expect_err("refuse overwrite");
+        assert!(matches!(error, KobanError::File { .. }));
+
+        ensure_download_path(&existing, true).expect("force overwrite allowed");
+
+        let missing_parent = tempdir.path().join("missing").join("invoice.pdf");
+        let error = ensure_download_path(&missing_parent, true).expect_err("missing parent");
+        assert!(matches!(error, KobanError::File { .. }));
     }
 
     #[tokio::test]
@@ -1295,6 +1979,21 @@ mod tests {
                 "data": {"id": "invoice_1", "number": "INV-1", "status_id": 2}
             }));
         });
+        let invoice_list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/invoices")
+                .query_param("page", "1")
+                .query_param("per_page", "10");
+            then.status(200).json_body(serde_json::json!({
+                "data": [{"id": "invoice_2", "number": "INV-2", "status_id": 1}]
+            }));
+        });
+        let invoice_template = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/invoices/create");
+            then.status(200).json_body(serde_json::json!({
+                "data": {"id": "", "number": "", "line_items": []}
+            }));
+        });
         let payments = server.mock(|when, then| {
             when.method(GET)
                 .path("/api/v1/payments")
@@ -1327,6 +2026,10 @@ mod tests {
                     page: 1,
                     per_page: 20,
                     include: Vec::new(),
+                    filters: Vec::new(),
+                    sort: None,
+                    all: false,
+                    limit: None,
                 }))),
             },
             config.clone(),
@@ -1338,7 +2041,7 @@ mod tests {
         let output = execute_with_config(
             Cli {
                 output: OutputFormat::Table,
-                command: Some(Commands::Invoices(ResourceCommand::Show(ShowArgs {
+                command: Some(Commands::Invoices(InvoiceCommand::Show(ShowArgs {
                     id: "invoice_1".to_string(),
                     include: Vec::new(),
                 }))),
@@ -1351,11 +2054,47 @@ mod tests {
 
         let output = execute_with_config(
             Cli {
+                output: OutputFormat::Table,
+                command: Some(Commands::Invoices(InvoiceCommand::List(ListArgs {
+                    page: 1,
+                    per_page: 10,
+                    include: Vec::new(),
+                    filters: Vec::new(),
+                    sort: None,
+                    all: false,
+                    limit: None,
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("invoice list");
+        assert!(output.contains("INV-2"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Invoices(InvoiceCommand::Template(TemplateArgs {
+                    include: Vec::new(),
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect("invoice template");
+        assert!(output.contains("line_items"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
                 output: OutputFormat::Json,
                 command: Some(Commands::Payments(ResourceCommand::List(ListArgs {
                     page: 1,
                     per_page: 20,
                     include: vec!["client".to_string(), " ".to_string()],
+                    filters: Vec::new(),
+                    sort: None,
+                    all: false,
+                    limit: None,
                 }))),
             },
             config.clone(),
@@ -1380,12 +2119,10 @@ mod tests {
         let output = execute_with_config(
             Cli {
                 output: OutputFormat::Json,
-                command: Some(Commands::Invoices(ResourceCommand::EditTemplate(
-                    ShowArgs {
-                        id: "invoice_1".to_string(),
-                        include: vec!["client".to_string()],
-                    },
-                ))),
+                command: Some(Commands::Invoices(InvoiceCommand::EditTemplate(ShowArgs {
+                    id: "invoice_1".to_string(),
+                    include: vec!["client".to_string()],
+                }))),
             },
             config,
         )
@@ -1395,6 +2132,8 @@ mod tests {
 
         clients.assert();
         invoices.assert();
+        invoice_list.assert();
+        invoice_template.assert();
         payments.assert();
         client_template.assert();
         invoice_edit_template.assert();
