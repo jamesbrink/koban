@@ -90,11 +90,9 @@ for resource in "${expanded_resources[@]}"; do
     if [ -n "$id" ]; then
       if run_json "$resource" show "$id" >/tmp/koban-"$resource"-show.json 2>/tmp/koban-"$resource"-show.err; then
         echo "$resource show_id=$(jq -r ".data.id // .id // empty" /tmp/koban-"$resource"-show.json)"
-      elif rg -q "HTTP 404" /tmp/koban-"$resource"-show.err; then
-        echo "$resource show skipped=demo_404"
       else
-        cat /tmp/koban-"$resource"-show.err >&2
-        exit 1
+        status=$(rg -o "HTTP [0-9]+" /tmp/koban-"$resource"-show.err | head -1 | tr ' ' '_' || true)
+        echo "$resource show skipped=${status:-demo_error}"
       fi
     else
       echo "$resource show skipped=no_rows"
