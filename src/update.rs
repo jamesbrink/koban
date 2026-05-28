@@ -6,7 +6,7 @@
 
 use std::{
     io::Read as _,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -17,7 +17,7 @@ use crate::{KobanError, Result};
 const GITHUB_REPO: &str = "jamesbrink/koban";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InstallKind {
+enum InstallKind {
     Nix,
     Cargo,
     Homebrew,
@@ -36,13 +36,60 @@ impl InstallKind {
 }
 
 pub fn run(check: bool, force: bool, version: Option<String>) -> Result<String> {
-    ensure_curl()?;
+    run_with_ops(&SystemOps, check, force, version)
+}
 
+trait UpdateOps {
+    fn ensure_curl(&self) -> Result<()>;
+    fn fetch_latest_tag(&self) -> Result<String>;
+    fn current_exe(&self) -> Result<PathBuf>;
+    fn fetch_url(&self, url: &str) -> Result<Vec<u8>>;
+    fn replace_binary(&self, new_binary: &[u8], exe_path: &Path) -> Result<()>;
+}
+
+struct SystemOps;
+
+impl UpdateOps for SystemOps {
+    fn ensure_curl(&self) -> Result<()> {
+        ensure_curl()
+    }
+
+    fn fetch_latest_tag(&self) -> Result<String> {
+        fetch_latest_tag()
+    }
+
+    fn current_exe(&self) -> Result<PathBuf> {
+        std::env::current_exe()
+            .and_then(|path| path.canonicalize())
+            .map_err(|source| KobanError::Update {
+                message: format!("could not resolve current executable: {source}"),
+            })
+    }
+
+    fn fetch_url(&self, url: &str) -> Result<Vec<u8>> {
+        fetch_url(url)
+    }
+
+    fn replace_binary(&self, new_binary: &[u8], exe_path: &Path) -> Result<()> {
+        replace_binary(new_binary, exe_path)
+    }
+}
+
+fn run_with_ops(
+    ops: &impl UpdateOps,
+    check: bool,
+    force: bool,
+    version: Option<String>,
+) -> Result<String> {
     let current = env!("CARGO_PKG_VERSION");
     let target_tag = match version {
         Some(version) => normalize_tag(&version),
-        None => fetch_latest_tag()?,
+        None => {
+            ops.ensure_curl()?;
+            ops.fetch_latest_tag()?
+        }
     };
+    validate_tag(&target_tag)?;
     let remote = target_tag.strip_prefix('v').unwrap_or(&target_tag);
 
     let mut lines = vec![format!("Current version: {current}")];
@@ -67,11 +114,13 @@ pub fn run(check: bool, force: bool, version: Option<String>) -> Result<String> 
         return Ok(lines.join("\n"));
     }
 
-    let exe_path = std::env::current_exe()
-        .and_then(|path| path.canonicalize())
-        .map_err(|source| KobanError::Update {
-            message: format!("could not resolve current executable: {source}"),
-        })?;
+    if !force && !is_newer(current, remote) {
+        return Err(KobanError::Update {
+            message: format!("refusing to downgrade from {current} to {remote} without --force"),
+        });
+    }
+
+    let exe_path = ops.current_exe()?;
     let install_kind = detect_install_kind(&exe_path);
     if let Some(hint) = upgrade_hint(install_kind, &target_tag) {
         return Err(KobanError::Update {
@@ -94,20 +143,23 @@ pub fn run(check: bool, force: bool, version: Option<String>) -> Result<String> 
     };
     lines.push(format!("{action}: {current} -> {remote}"));
 
+    ops.ensure_curl()?;
+
     let asset_name = detect_asset_name()?;
     let asset_url =
         format!("https://github.com/{GITHUB_REPO}/releases/download/{target_tag}/{asset_name}");
     let sums_url =
         format!("https://github.com/{GITHUB_REPO}/releases/download/{target_tag}/SHA256SUMS");
 
-    let archive = fetch_url(&asset_url)?;
-    let sums = String::from_utf8(fetch_url(&sums_url)?).map_err(|source| KobanError::Update {
-        message: format!("SHA256SUMS contained non-UTF-8 data: {source}"),
-    })?;
+    let archive = ops.fetch_url(&asset_url)?;
+    let sums =
+        String::from_utf8(ops.fetch_url(&sums_url)?).map_err(|source| KobanError::Update {
+            message: format!("SHA256SUMS contained non-UTF-8 data: {source}"),
+        })?;
     verify_checksum(&sums, asset_name, &archive)?;
 
     let binary = extract_binary_from_tarball(&archive)?;
-    replace_binary(&binary, &exe_path)?;
+    ops.replace_binary(&binary, &exe_path)?;
 
     lines.push("Checksum verified (SHA-256).".to_string());
     lines.push(format!(
@@ -142,7 +194,17 @@ fn normalize_tag(version: &str) -> String {
     }
 }
 
-pub fn detect_install_kind(exe_path: &Path) -> InstallKind {
+fn validate_tag(tag: &str) -> Result<()> {
+    if tag.starts_with('v') && parse_version(tag).is_some() {
+        Ok(())
+    } else {
+        Err(KobanError::Update {
+            message: format!("invalid release tag `{tag}`; expected a tag like v0.1.0"),
+        })
+    }
+}
+
+fn detect_install_kind(exe_path: &Path) -> InstallKind {
     let path = exe_path.to_string_lossy();
     if path.contains("/nix/store/") {
         InstallKind::Nix
@@ -375,6 +437,10 @@ fn replace_binary(new_binary: &[u8], exe_path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use std::io::Write as _;
+    use std::{
+        cell::{Cell, RefCell},
+        collections::HashSet,
+    };
 
     use serde_json::Value;
 
@@ -385,6 +451,154 @@ mod tests {
         assert!(is_newer("0.0.1", "v0.0.2"));
         assert!(!is_newer("0.0.2", "v0.0.1"));
         assert_eq!(parse_version("v1.2"), None);
+        assert!(validate_tag("v1.2.3").is_ok());
+        assert!(validate_tag("1.2.3").is_err());
+    }
+
+    #[test]
+    fn explicit_check_tag_does_not_require_network_or_curl() {
+        let current = env!("CARGO_PKG_VERSION");
+        let output = run(true, false, Some(format!("v{current}"))).expect("check");
+        assert!(output.contains(&format!("Current version: {current}")));
+        assert!(output.contains("Up to date"), "got: {output}");
+    }
+
+    #[test]
+    fn explicit_invalid_tag_is_rejected() {
+        let error = run(true, false, Some("not-a-version".to_string())).expect_err("invalid tag");
+        assert!(error.to_string().contains("invalid release tag"));
+    }
+
+    #[test]
+    fn downgrade_requires_force_before_install_detection() {
+        let error = run(false, false, Some("v0.0.0".to_string())).expect_err("downgrade guard");
+        assert!(error.to_string().contains("refusing to downgrade"));
+    }
+
+    #[test]
+    fn current_version_without_check_exits_before_install_detection() {
+        let current = env!("CARGO_PKG_VERSION");
+        let ops = FakeOps::new(
+            &format!("v{current}"),
+            PathBuf::from("/nix/store/koban"),
+            b"unused",
+        );
+
+        let output =
+            run_with_ops(&ops, false, false, Some(format!("v{current}"))).expect("current");
+
+        assert!(
+            output.contains(&format!("Already up to date ({current})")),
+            "got: {output}"
+        );
+        assert_eq!(ops.curl_checks.get(), 0);
+        assert!(ops.replaced.borrow().is_none());
+    }
+
+    #[test]
+    fn check_reports_older_explicit_versions_without_downgrading() {
+        let ops = FakeOps::new("v0.0.0", PathBuf::from("/tmp/koban"), b"unused");
+
+        let output = run_with_ops(&ops, true, false, Some("v0.0.0".to_string())).expect("check");
+
+        assert!(
+            output.contains(&format!(
+                "Version 0.0.0 is available (current: {})",
+                env!("CARGO_PKG_VERSION")
+            )),
+            "got: {output}"
+        );
+        assert!(ops.replaced.borrow().is_none());
+    }
+
+    #[test]
+    fn latest_check_uses_redirect_without_downloading_assets() {
+        let ops = FakeOps::new("v0.0.2", PathBuf::from("/tmp/koban"), b"unused");
+
+        let output = run_with_ops(&ops, true, false, None).expect("latest check");
+
+        assert!(
+            output.contains("New version available: 0.0.2"),
+            "got: {output}"
+        );
+        assert_eq!(ops.curl_checks.get(), 1);
+        assert!(ops.fetches.borrow().is_empty());
+        assert!(ops.replaced.borrow().is_none());
+    }
+
+    #[test]
+    fn managed_update_downloads_verifies_and_replaces_binary() {
+        let expected_binary = b"fresh-koban";
+        let archive = make_tarball(&[("bin/koban", expected_binary)]);
+        let exe = tempfile::tempdir()
+            .expect("temp dir")
+            .path()
+            .join("bin")
+            .join("koban");
+        std::fs::create_dir_all(exe.parent().expect("parent")).expect("bin dir");
+        let ops = FakeOps::new("v0.0.2", exe.clone(), &archive);
+
+        let output = run_with_ops(&ops, false, false, Some("v0.0.2".to_string())).expect("update");
+
+        assert!(
+            output.contains(&format!("Updating: {} -> 0.0.2", env!("CARGO_PKG_VERSION"))),
+            "got: {output}"
+        );
+        assert!(output.contains("Checksum verified"));
+        assert_eq!(ops.curl_checks.get(), 1);
+        assert_eq!(
+            ops.replaced.borrow().as_deref(),
+            Some(expected_binary.as_slice())
+        );
+        let fetches = ops.fetches.borrow();
+        assert_eq!(fetches.len(), 2);
+        assert!(fetches.iter().any(
+            |url| url.ends_with("/v0.0.2/koban-aarch64-apple-darwin.tar.gz")
+                || url.ends_with("/v0.0.2/koban-x86_64-apple-darwin.tar.gz")
+                || url.ends_with("/v0.0.2/koban-x86_64-unknown-linux-gnu.tar.gz")
+                || url.ends_with("/v0.0.2/koban-aarch64-unknown-linux-gnu.tar.gz")
+        ));
+        assert!(
+            fetches
+                .iter()
+                .any(|url| url.ends_with("/v0.0.2/SHA256SUMS"))
+        );
+    }
+
+    #[test]
+    fn package_managed_installs_return_upgrade_guidance() {
+        let ops = FakeOps::new(
+            "v0.0.2",
+            PathBuf::from("/nix/store/abc-koban/bin/koban"),
+            b"unused",
+        );
+
+        let error = run_with_ops(&ops, false, false, Some("v0.0.2".to_string()))
+            .expect_err("managed install");
+
+        assert!(error.to_string().contains("installed via Nix"), "{error}");
+        assert!(
+            error.to_string().contains("nix profile upgrade koban"),
+            "{error}"
+        );
+        assert_eq!(ops.curl_checks.get(), 0);
+    }
+
+    #[test]
+    fn upgrade_hints_cover_supported_package_managers() {
+        assert_eq!(InstallKind::Cargo.label(), "cargo");
+        assert_eq!(InstallKind::Homebrew.label(), "Homebrew");
+        assert_eq!(InstallKind::Managed.label(), "direct install");
+        assert!(
+            upgrade_hint(InstallKind::Cargo, "v1.2.3")
+                .expect("cargo hint")
+                .contains("--tag v1.2.3")
+        );
+        assert_eq!(
+            upgrade_hint(InstallKind::Homebrew, "v1.2.3").as_deref(),
+            Some("  brew upgrade koban")
+        );
+        assert!(upgrade_hint(InstallKind::Managed, "v1.2.3").is_none());
     }
 
     #[test]
@@ -429,6 +643,10 @@ mod tests {
 
         let err = verify_checksum(&sums, "missing.tar.gz", data).expect_err("missing asset");
         assert!(err.to_string().contains("not found"));
+
+        let err = verify_checksum(&sums, "koban-test.tar.gz", b"different")
+            .expect_err("checksum mismatch");
+        assert!(err.to_string().contains("checksum mismatch"));
     }
 
     #[test]
@@ -439,6 +657,18 @@ mod tests {
             extract_binary_from_tarball(&archive).expect("binary"),
             expected
         );
+
+        let archive = make_tarball(&[("README.md", b"docs")]);
+        let err = extract_binary_from_tarball(&archive).expect_err("missing binary");
+        assert!(err.to_string().contains("binary not found"));
+    }
+
+    #[test]
+    fn writable_install_dir_probe_accepts_existing_parent() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let exe = dir.path().join("koban");
+
+        ensure_writable_install_dir(&exe).expect("writable directory");
     }
 
     #[test]
@@ -483,5 +713,63 @@ mod tests {
             ]
         });
         assert_eq!(body["repo"], Value::String("jamesbrink/koban".to_string()));
+    }
+
+    struct FakeOps {
+        latest_tag: String,
+        exe_path: PathBuf,
+        archive: Vec<u8>,
+        sums: String,
+        curl_checks: Cell<u32>,
+        fetches: RefCell<HashSet<String>>,
+        replaced: RefCell<Option<Vec<u8>>>,
+    }
+
+    impl FakeOps {
+        fn new(latest_tag: &str, exe_path: PathBuf, archive: &[u8]) -> Self {
+            let asset_name = detect_asset_name().expect("supported test platform");
+            let mut hasher = Sha256::new();
+            hasher.update(archive);
+            let sums = format!("{:x}  {asset_name}\n", hasher.finalize());
+
+            Self {
+                latest_tag: latest_tag.to_string(),
+                exe_path,
+                archive: archive.to_vec(),
+                sums,
+                curl_checks: Cell::new(0),
+                fetches: RefCell::new(HashSet::new()),
+                replaced: RefCell::new(None),
+            }
+        }
+    }
+
+    impl UpdateOps for FakeOps {
+        fn ensure_curl(&self) -> Result<()> {
+            self.curl_checks.set(self.curl_checks.get() + 1);
+            Ok(())
+        }
+
+        fn fetch_latest_tag(&self) -> Result<String> {
+            Ok(self.latest_tag.clone())
+        }
+
+        fn current_exe(&self) -> Result<PathBuf> {
+            Ok(self.exe_path.clone())
+        }
+
+        fn fetch_url(&self, url: &str) -> Result<Vec<u8>> {
+            self.fetches.borrow_mut().insert(url.to_string());
+            if url.ends_with("/SHA256SUMS") {
+                Ok(self.sums.as_bytes().to_vec())
+            } else {
+                Ok(self.archive.clone())
+            }
+        }
+
+        fn replace_binary(&self, new_binary: &[u8], _exe_path: &Path) -> Result<()> {
+            *self.replaced.borrow_mut() = Some(new_binary.to_vec());
+            Ok(())
+        }
     }
 }

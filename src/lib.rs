@@ -3,9 +3,9 @@
 //! The public surface is intentionally small while the CLI and Invoice Ninja
 //! client model settle.
 
-pub mod update;
-
 use std::{env, fmt};
+
+mod update;
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use miette::Diagnostic;
@@ -438,9 +438,8 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Payments(command)) => {
             execute_resource(&client, output, Resource::Payments, command).await
         }
-        Some(Commands::Update { .. }) | Some(Commands::Completions { .. }) | None => {
-            Ok(String::new())
-        }
+        Some(Commands::Update { check, force, tag }) => update::run(check, force, tag),
+        Some(Commands::Completions { .. }) | None => Ok(String::new()),
     }
 }
 
