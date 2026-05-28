@@ -42,7 +42,7 @@ jobs:
       - id: version
         run: |
           set -euo pipefail
-          current=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "koban") | .version')
+          current=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "koban-cli") | .version')
           IFS='.' read -r major minor _ <<< "$current"
           next_minor="${major}.$((minor + 1)).0"
 
@@ -138,8 +138,14 @@ jobs:
           NIGHTLY_VERSION: ${{ needs.compute-version.outputs.version }}
         run: |
           set -euo pipefail
-          perl -0pi -e 's/^version = "[^"]+"/version = "$ENV{NIGHTLY_VERSION}"/m' Cargo.toml
+          # Stamp the nightly version into both workspace members and the
+          # intra-workspace dependency requirement, then refresh the lockfile so
+          # the subsequent --locked build succeeds.
+          perl -0pi -e 's/^version = "[^"]+"/version = "$ENV{NIGHTLY_VERSION}"/m' crates/koban/Cargo.toml
+          perl -0pi -e 's/^version = "[^"]+"/version = "$ENV{NIGHTLY_VERSION}"/m' crates/koban-cli/Cargo.toml
+          perl -0pi -e 's/^(koban = \{ version = ")[^"]+/${1}$ENV{NIGHTLY_VERSION}/m' Cargo.toml
           cargo update -p koban --precise "$NIGHTLY_VERSION"
+          cargo update -p koban-cli --precise "$NIGHTLY_VERSION"
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} --locked

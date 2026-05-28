@@ -15,9 +15,9 @@ check_file() {
   fi
 }
 
-for file in $(find src tests -name '*.rs' -type f); do
+for file in $(find crates -name '*.rs' -type f); do
   case "$file" in
-    src/tests/*|tests/*)
+    */tests/*)
       check_file "$file" "$max_test_lines"
       ;;
     *)

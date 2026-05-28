@@ -1,3 +1,4 @@
 {
-  ".": "0.0.1"
+  "crates/koban": "0.1.0",
+  "crates/koban-cli": "0.1.0"
 }

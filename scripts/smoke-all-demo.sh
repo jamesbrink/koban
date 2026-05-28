@@ -13,11 +13,11 @@ export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN
 echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
 run_json() {
-  cargo run --quiet -- --output json "$@"
+  cargo run --quiet -p koban-cli -- --output json "$@"
 }
 
 run_table() {
-  cargo run --quiet -- "$@"
+  cargo run --quiet -p koban-cli -- "$@"
 }
 
 created_ids=()
