@@ -112,7 +112,7 @@ koban search run --field query=acme --dry-run
 koban reports run --data-file report.json --dry-run
 ```
 
-Recurring invoice single-record actions are sent through Invoice Ninja's bulk
+Generic resource single-record actions are sent through Invoice Ninja's bulk
 action endpoint with a one-item `ids` list, matching the upstream API shape.
 Endpoint runner payload flags are accepted only for `POST` and `PUT`; `GET` and
 `DELETE` reject payloads so dry-runs cannot show a body that the live request
@@ -180,6 +180,9 @@ koban clients list --filter balance=gt:1000 --filter name=Bob --sort 'name|desc'
 koban invoices list --all --limit 100 --output json
 ```
 
+`--all` stops after 100 pages to avoid accidental unbounded traversal. JSON
+output includes `meta.page_cap_reached` when that guardrail is hit.
+
 Invoice download commands also use read-only `GET` routes and write PDF bytes to
 explicit file paths. Existing files are not overwritten unless `--force` is set.
 
@@ -188,7 +191,9 @@ writes expose broad guided fields such as `--name`, `--number`, `--client-id`,
 `--vendor-id`, `--project-id`, `--date`, `--due-date`, `--amount`, `--price`,
 `--quantity`, notes, repeatable `--field key=value`, and repeatable
 `--line-item key=value,...` for document-like resources. Raw JSON cannot be
-combined with guided fields or `--line-item`.
+combined with guided fields or `--line-item`. Generic `--field` values parse
+JSON-like scalars (`true`, `false`, `null`, and numbers); quote a field value to
+force a JSON string, such as `--field number='"1000"'`.
 
 ```sh
 koban invoices create --data '{"client_id":"...","line_items":[]}' --dry-run

@@ -125,7 +125,8 @@ Implemented design:
 - List commands expose explicit `--page` and `--per-page` flags.
 - List commands expose repeatable raw `--filter key=value` flags and a raw
   `--sort field|direction` flag.
-- List commands expose `--all` and `--limit` for controlled pagination.
+- List commands expose `--all` and `--limit` for controlled pagination. `--all`
+  stops after 100 pages and reports `meta.page_cap_reached` in JSON output.
 - List/show/template/edit-template/create/update/delete/bulk/upload/action
   commands expose repeatable, comma-separated `--include` flags when useful.
 - Single-page JSON output preserves the API response. Multi-page JSON output uses
@@ -190,7 +191,7 @@ PUT /api/v1/{resource}/{id}
 DELETE /api/v1/{resource}/{id}
 POST /api/v1/{resource}/bulk
 POST /api/v1/{resource}/{id}/upload
-GET|POST /api/v1/{resource}/{id}/{action}
+POST /api/v1/{resource}/bulk   # single-record actions use a one-item ids list
 ```
 
 Create and update accept either one raw JSON source (`--data`, `--data-file`, or
@@ -198,7 +199,8 @@ Create and update accept either one raw JSON source (`--data`, `--data-file`, or
 `--line-item`. Generic guided flags cover common fields:
 `--name`, `--number`, `--client-id`, `--vendor-id`, `--project-id`, `--date`,
 `--due-date`, `--amount`, `--price`, `--quantity`, notes, repeatable
-`--field key=value`, and repeatable `--line-item key=value,...`.
+`--field key=value`, and repeatable `--line-item key=value,...`. Generic
+`--field` values parse JSON-like scalars; quote a value to force a string.
 
 Invoice commands keep a specialized guided payload and trigger model for
 invoice-specific workflows:
@@ -221,8 +223,8 @@ Koban intentionally does not expose the documented `redirect` trigger.
 Note: the interactive docs label invoice document upload as `POST`, but the
 public demo API currently accepts `PUT /api/v1/invoices/{id}/upload`; Koban uses
 the live-compatible method for invoices and `POST` for generic resource uploads.
-Generic multipart uploads include Invoice Ninja's `_method=POST` form field and
-use the documented `documents` file field.
+Multipart uploads use the `documents[]` form field so repeatable `--file`
+arguments are sent as an array.
 
 Safety rules:
 
@@ -346,10 +348,9 @@ koban projects list --filter client_id=<client_id>
 koban tasks list --all --limit 50
 ```
 
-Recurring invoice single-record actions are represented as
-`POST /api/v1/recurring_invoices/bulk` with the requested action and a one-item
-`ids` list, because the upstream API documents recurring lifecycle actions on
-the bulk endpoint.
+Generic resource single-record actions are represented as
+`POST /api/v1/{resource}/bulk` with the requested action and a one-item `ids`
+list, matching the upstream controller shape used by lifecycle actions.
 
 ## Open Questions
 

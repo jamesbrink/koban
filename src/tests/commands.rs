@@ -433,6 +433,10 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
         post_action.contains("\"method\": \"POST\""),
         "got: {post_action}"
     );
+    assert!(
+        post_action.contains("api/v1/clients/bulk"),
+        "got: {post_action}"
+    );
 }
 
 #[tokio::test]

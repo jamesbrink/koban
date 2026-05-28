@@ -40,6 +40,16 @@ fn generic_payload_accepts_json_files_and_guided_fields() {
     assert_eq!(guided["client"]["name"], "Ada");
     assert_eq!(guided["amount"], 42.5);
     assert_eq!(guided["active"], true);
+
+    let forced_string = generic_payload(
+        GenericPayloadArgs {
+            fields: vec!["number=\"1000\"".to_string()],
+            ..GenericPayloadArgs::default()
+        },
+        true,
+    )
+    .expect("quoted scalar");
+    assert_eq!(forced_string["number"], "1000");
 }
 
 #[test]

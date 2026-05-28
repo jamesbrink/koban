@@ -161,8 +161,8 @@ impl ApiClient {
             path,
             query,
             files,
-            Some("POST"),
-            "documents",
+            None,
+            "documents[]",
         )
         .await
     }
@@ -300,5 +300,8 @@ fn first_json_string(value: &Value, path: &[&str]) -> Option<String> {
 }
 
 fn endpoint_label(url: &Url) -> String {
-    url.as_str().to_string()
+    let mut label = url.clone();
+    let _ = label.set_username("");
+    let _ = label.set_password(None);
+    label.as_str().to_string()
 }

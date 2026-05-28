@@ -21,6 +21,8 @@ use crate::{
     update,
 };
 
+const FETCH_ALL_PAGE_CAP: u32 = 100;
+
 pub async fn execute(cli: Cli) -> Result<String> {
     let output = cli.output;
     let command = cli.command;
@@ -316,17 +318,7 @@ async fn execute_resource_bulk(
     require_confirmation(&format!("{} bulk action", resource.label()), &args.safety)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-
-    let mut body = serde_json::Map::new();
-    body.insert("action".to_string(), Value::String(args.action));
-    body.insert(
-        "ids".to_string(),
-        Value::Array(args.ids.into_iter().map(Value::String).collect()),
-    );
-    if let Some(email_type) = args.email_type {
-        body.insert("email_type".to_string(), Value::String(email_type));
-    }
-    let body = Value::Object(body);
+    let body = bulk_action_body(args.action, args.ids, args.email_type);
     let path = format!("api/v1/{}/bulk", resource.path());
 
     if args.safety.dry_run {
@@ -382,43 +374,17 @@ async fn execute_resource_action(
     require_confirmation(&format!("{} action", resource.label()), &args.safety)?;
     validate_path_segment("resource action", &args.action)?;
     let body = resource_payload(args.payload, false)?;
-    let has_body = body.as_object().is_some_and(|body| !body.is_empty());
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-
-    if resource == Resource::RecurringInvoices {
-        let path = format!("api/v1/{}/bulk", resource.path());
-        let mut bulk_body = json!({
-            "action": args.action,
-            "ids": [args.id],
-        });
-        merge_resource_action_payload(&mut bulk_body, body);
-
-        if args.safety.dry_run {
-            return render_dry_run("POST", &path, &query, Some(&bulk_body), None);
-        }
-
-        let json = client.post_json(&path, &query, &bulk_body).await?;
-        return render_value(output, Some(resource), &json);
-    }
-
-    let path = format!("api/v1/{}/{}/{}", resource.path(), args.id, args.action);
+    let path = format!("api/v1/{}/bulk", resource.path());
+    let mut bulk_body = bulk_action_body(args.action, vec![args.id], None);
+    merge_resource_action_payload(&mut bulk_body, body);
 
     if args.safety.dry_run {
-        return render_dry_run(
-            if has_body { "POST" } else { "GET" },
-            &path,
-            &query,
-            has_body.then_some(&body),
-            None,
-        );
+        return render_dry_run("POST", &path, &query, Some(&bulk_body), None);
     }
 
-    let json = if has_body {
-        client.post_json(&path, &query, &body).await?
-    } else {
-        client.get_json(&path, &query).await?
-    };
+    let json = client.post_json(&path, &query, &bulk_body).await?;
     render_value(output, Some(resource), &json)
 }
 
@@ -660,17 +626,7 @@ async fn execute_invoice_bulk(
     require_confirmation("invoice bulk action", &args.safety)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-
-    let mut body = serde_json::Map::new();
-    body.insert("action".to_string(), Value::String(args.action));
-    body.insert(
-        "ids".to_string(),
-        Value::Array(args.ids.into_iter().map(Value::String).collect()),
-    );
-    if let Some(email_type) = args.email_type {
-        body.insert("email_type".to_string(), Value::String(email_type));
-    }
-    let body = Value::Object(body);
+    let body = bulk_action_body(args.action, args.ids, args.email_type);
 
     if args.safety.dry_run {
         return render_dry_run("POST", "api/v1/invoices/bulk", &query, Some(&body), None);
@@ -680,6 +636,19 @@ async fn execute_invoice_bulk(
         .post_json("api/v1/invoices/bulk", &query, &body)
         .await?;
     render_value(output, Some(Resource::Invoices), &json)
+}
+
+fn bulk_action_body(action: String, ids: Vec<String>, email_type: Option<String>) -> Value {
+    let mut body = serde_json::Map::new();
+    body.insert("action".to_string(), Value::String(action));
+    body.insert(
+        "ids".to_string(),
+        Value::Array(ids.into_iter().map(Value::String).collect()),
+    );
+    if let Some(email_type) = email_type {
+        body.insert("email_type".to_string(), Value::String(email_type));
+    }
+    Value::Object(body)
 }
 
 async fn execute_invoice_upload(
@@ -752,6 +721,7 @@ async fn fetch_all_pages(
 ) -> Result<Value> {
     let mut page = start_page;
     let mut pages_fetched = 0_u32;
+    let mut page_cap_reached = false;
     let mut rows = Vec::new();
 
     loop {
@@ -779,6 +749,10 @@ async fn fetch_all_pages(
         if page_len < per_page as usize || limit.is_some_and(|limit| rows.len() >= limit as usize) {
             break;
         }
+        if pages_fetched >= FETCH_ALL_PAGE_CAP {
+            page_cap_reached = true;
+            break;
+        }
         page += 1;
     }
 
@@ -786,6 +760,8 @@ async fn fetch_all_pages(
         "data": rows,
         "meta": {
             "pages_fetched": pages_fetched,
+            "page_cap": FETCH_ALL_PAGE_CAP,
+            "page_cap_reached": page_cap_reached,
             "limit": limit,
         }
     }))

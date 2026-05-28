@@ -998,9 +998,7 @@ fn generic_upload_posts_multipart_method_override_when_confirmed() {
     let mock = server.mock(|when, then| {
         when.method(POST)
             .path("/api/v1/clients/client_1/upload")
-            .body_includes("name=\"_method\"")
-            .body_includes("POST")
-            .body_includes("name=\"documents\"")
+            .body_includes("name=\"documents[]\"")
             .header("X-API-TOKEN", "test-token");
         then.status(200).json_body(json!({
             "data": {

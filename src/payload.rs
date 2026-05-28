@@ -205,6 +205,8 @@ pub(crate) fn parse_scalar(value: &str) -> Value {
         Value::Bool(false)
     } else if value.eq_ignore_ascii_case("null") {
         Value::Null
+    } else if let Ok(string) = serde_json::from_str::<String>(value) {
+        Value::String(string)
     } else if let Ok(number) = value.parse::<serde_json::Number>() {
         Value::Number(number)
     } else {

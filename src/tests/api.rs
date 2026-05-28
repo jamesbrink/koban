@@ -92,6 +92,33 @@ async fn json_write_methods_report_decode_api_and_transport_errors() {
     assert!(api_message.contains("/api/v1/invoices/invoice_1"));
     api_failure.assert();
 
+    let userinfo_failure = server.mock(|when, then| {
+        when.method(GET).path("/api/v1/invoices");
+        then.status(403).body(r#"{"message":"denied"}"#);
+    });
+    let mut userinfo_url = url::Url::parse(&server.base_url()).expect("server URL");
+    userinfo_url.set_username("user").expect("set username");
+    userinfo_url
+        .set_password(Some("pass"))
+        .expect("set password");
+    let userinfo_server =
+        ApiClient::new(Config::from_values(userinfo_url.as_str(), "token").expect("config"));
+    let userinfo = userinfo_server
+        .get_json("api/v1/invoices", &[("page".to_string(), "1".to_string())])
+        .await
+        .expect_err("userinfo API failure");
+    let userinfo_message = userinfo.to_string();
+    assert!(matches!(userinfo, KobanError::Api { .. }));
+    assert!(
+        userinfo_message.contains("page=1"),
+        "got: {userinfo_message}"
+    );
+    assert!(
+        !userinfo_message.contains("user:pass"),
+        "got: {userinfo_message}"
+    );
+    userinfo_failure.assert();
+
     let offline =
         ApiClient::new(Config::from_values("http://127.0.0.1:9", "secret-token").expect("config"));
     let transport = offline

@@ -552,7 +552,7 @@ pub struct ResourcePayloadArgs {
     #[arg(long, conflicts_with_all = ["data", "data_file"])]
     pub stdin: bool,
 
-    /// Set any payload field as key=value; dotted paths create nested objects
+    /// Set any payload field as key=value; quote values to force JSON strings
     #[arg(long = "field", value_name = "key=value", action = clap::ArgAction::Append)]
     pub fields: Vec<String>,
 
@@ -822,7 +822,7 @@ pub struct InvoiceTriggerArgs {
 
 #[derive(Debug, Args)]
 pub struct WriteSafetyArgs {
-    /// Print the request that would be sent without calling Invoice Ninja
+    /// Print the JSON request preview without calling Invoice Ninja
     #[arg(long)]
     pub dry_run: bool,
 
