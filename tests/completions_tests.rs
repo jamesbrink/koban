@@ -136,6 +136,24 @@ fn dynamic_expanded_resource_completions_include_write_commands() {
 }
 
 #[test]
+fn dynamic_inspect_resource_completions_omit_write_commands() {
+    koban()
+        .env("COMPLETE", "bash")
+        .env("_CLAP_COMPLETE_INDEX", "2")
+        .args(["--", "koban", "imports", ""])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("show"))
+        .stdout(predicate::str::contains("create").not())
+        .stdout(predicate::str::contains("update").not())
+        .stdout(predicate::str::contains("delete").not())
+        .stdout(predicate::str::contains("bulk").not())
+        .stdout(predicate::str::contains("upload").not())
+        .stdout(predicate::str::contains("action").not());
+}
+
+#[test]
 fn dynamic_invoice_completions_include_download_commands() {
     koban()
         .env("COMPLETE", "bash")

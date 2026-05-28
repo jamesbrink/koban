@@ -6,15 +6,16 @@ use crate::{
     Cli, Commands, Config, KobanError, OutputFormat, Result,
     api::ApiClient,
     cli::{
-        BulkArgs, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod, InvoiceActionArgs,
-        InvoiceCommand, InvoiceWriteArgs, ListArgs, ResourceActionArgs, ResourceCommand,
-        ResourceWriteArgs, UpdateInvoiceArgs, UpdateResourceArgs, UploadArgs,
+        BulkArgs, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod,
+        InspectResourceCommand, InvoiceActionArgs, InvoiceCommand, InvoiceWriteArgs, ListArgs,
+        ResourceActionArgs, ResourceCommand, ResourceWriteArgs, UpdateInvoiceArgs,
+        UpdateResourceArgs, UploadArgs,
     },
     invoice::{
         invoice_payload, push_invoice_triggers, render_dry_run, require_confirmation,
         validate_invoice_triggers, validate_path_segment,
     },
-    payload::resource_payload,
+    payload::{merge_resource_action_payload, resource_payload},
     render::{render_value, response_rows},
     resource::Resource,
     update,
@@ -109,10 +110,10 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
             execute_resource(&client, output, Resource::TaskStatuses, command).await
         }
         Some(Commands::Activities(command)) => {
-            execute_resource(&client, output, Resource::Activities, command).await
+            execute_inspect_resource(&client, output, Resource::Activities, command).await
         }
         Some(Commands::SystemLogs(command)) => {
-            execute_resource(&client, output, Resource::SystemLogs, command).await
+            execute_inspect_resource(&client, output, Resource::SystemLogs, command).await
         }
         Some(Commands::Documents(command)) => {
             execute_resource(&client, output, Resource::Documents, command).await
@@ -133,7 +134,7 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
             execute_resource(&client, output, Resource::CompanyGateways, command).await
         }
         Some(Commands::CompanyLedger(command)) => {
-            execute_resource(&client, output, Resource::CompanyLedger, command).await
+            execute_inspect_resource(&client, output, Resource::CompanyLedger, command).await
         }
         Some(Commands::CompanyUsers(command)) => {
             execute_resource(&client, output, Resource::CompanyUsers, command).await
@@ -145,7 +146,7 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
             execute_resource(&client, output, Resource::Webhooks, command).await
         }
         Some(Commands::Imports(command)) => {
-            execute_resource(&client, output, Resource::Imports, command).await
+            execute_inspect_resource(&client, output, Resource::Imports, command).await
         }
         Some(Commands::Subscriptions(command)) => {
             execute_resource(&client, output, Resource::Subscriptions, command).await
@@ -228,6 +229,22 @@ async fn execute_resource(
         }
         ResourceCommand::Action(args) => {
             execute_resource_action(client, output, resource, args).await
+        }
+    }
+}
+
+async fn execute_inspect_resource(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    command: InspectResourceCommand,
+) -> Result<String> {
+    match command {
+        InspectResourceCommand::List(args) => {
+            execute_resource(client, output, resource, ResourceCommand::List(args)).await
+        }
+        InspectResourceCommand::Show(args) => {
+            execute_resource(client, output, resource, ResourceCommand::Show(args)).await
         }
     }
 }
@@ -406,20 +423,6 @@ async fn execute_resource_action(
         client.get_json(&path, &query).await?
     };
     render_value(output, Some(resource), &json)
-}
-
-fn merge_resource_action_payload(target: &mut Value, extra: Value) {
-    let Some(extra) = extra.as_object() else {
-        return;
-    };
-    let Some(target) = target.as_object_mut() else {
-        return;
-    };
-    for (key, value) in extra {
-        if key != "action" && key != "ids" {
-            target.insert(key.clone(), value.clone());
-        }
-    }
 }
 
 async fn execute_invoice(

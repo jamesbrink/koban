@@ -167,11 +167,11 @@ Examples:
 
     /// List, show, and inspect activities
     #[command(subcommand)]
-    Activities(ResourceCommand),
+    Activities(InspectResourceCommand),
 
     /// List, show, and inspect system logs
     #[command(name = "system-logs", subcommand)]
-    SystemLogs(ResourceCommand),
+    SystemLogs(InspectResourceCommand),
 
     /// List, show, and manage documents
     #[command(subcommand)]
@@ -199,7 +199,7 @@ Examples:
 
     /// List and inspect company ledger entries
     #[command(name = "company-ledger", subcommand)]
-    CompanyLedger(ResourceCommand),
+    CompanyLedger(InspectResourceCommand),
 
     /// List, show, and manage company users
     #[command(name = "company-users", subcommand)]
@@ -215,7 +215,7 @@ Examples:
 
     /// List and inspect imports
     #[command(subcommand)]
-    Imports(ResourceCommand),
+    Imports(InspectResourceCommand),
 
     /// List, show, and manage subscriptions
     #[command(subcommand)]
@@ -348,6 +348,12 @@ Examples:
 
     /// Run a custom resource action
     Action(ResourceActionArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum InspectResourceCommand {
+    List(ListArgs),
+    Show(ShowArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -865,7 +871,6 @@ pub struct UploadArgs {
     /// Invoice Ninja hashed ID
     pub id: String,
 
-    /// File to upload; repeatable
     #[arg(long = "file", value_name = "PATH", action = clap::ArgAction::Append, required = true)]
     pub files: Vec<PathBuf>,
 

@@ -162,6 +162,10 @@ koban utility run
 `companies`, `company-gateways`, `company-ledger`, `company-users`, `tokens`,
 `webhooks`, `imports`, `subscriptions`, and `client-gateway-tokens`.
 
+Inspect-only/high-risk groups `activities`, `system-logs`, `company-ledger`,
+and `imports` expose only `list` and `show`. They do not expose generic write
+commands.
+
 The `template` and `edit-template` commands use Invoice Ninja's read-only
 `GET /create` and `GET /{id}/edit` routes. They return default/editable payloads
 for schema discovery; they do not create or update records.

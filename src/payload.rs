@@ -100,6 +100,20 @@ pub(crate) fn resource_payload(args: ResourcePayloadArgs, require_payload: bool)
     Ok(body)
 }
 
+pub(crate) fn merge_resource_action_payload(target: &mut Value, extra: Value) {
+    let Some(extra) = extra.as_object() else {
+        return;
+    };
+    let Some(target) = target.as_object_mut() else {
+        return;
+    };
+    for (key, value) in extra {
+        if key != "action" && key != "ids" {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+}
+
 fn push_optional_field(fields: &mut Vec<String>, key: &str, value: Option<String>) {
     if let Some(value) = value {
         fields.push(format!("{key}={value}"));

@@ -68,6 +68,13 @@ expanded_resources=(
   designs templates users companies company-gateways company-ledger
   company-users tokens webhooks imports subscriptions client-gateway-tokens
 )
+expanded_write_resources=(
+  locations products recurring-invoices purchase-orders recurring-expenses
+  bank-transactions bank-integrations bank-transaction-rules expense-categories
+  tax-rates payment-terms task-statuses documents designs templates users
+  companies company-gateways company-users tokens webhooks subscriptions
+  client-gateway-tokens
+)
 demo_optional_404=(templates company-users imports)
 
 allows_demo_404() {
@@ -97,7 +104,7 @@ for resource in "${expanded_resources[@]}"; do
     else
       echo "$resource show skipped=no_rows"
     fi
-  elif allows_demo_404 "$resource"; then
+  elif allows_demo_404 "$resource" && rg -q "HTTP 404" /tmp/koban-"$resource"-list.err; then
     echo "$resource list skipped=demo_404"
   else
     cat /tmp/koban-"$resource"-list.err >&2
@@ -133,7 +140,7 @@ run_json invoices upload dry_invoice --file "$upload_dry_file" --dry-run >/tmp/k
 echo "upload_dry_run=$(jq -r .dry_run /tmp/koban-upload-dry-run.json) method=$(jq -r .method /tmp/koban-upload-dry-run.json)"
 
 echo "== expanded api dry-run commands =="
-for resource in "${expanded_resources[@]}"; do
+for resource in "${expanded_write_resources[@]}"; do
   run_json "$resource" create --name KobanSmoke --dry-run >/tmp/koban-"$resource"-create-dry-run.json
   run_json "$resource" update dry_id --field notes=Updated --dry-run >/tmp/koban-"$resource"-update-dry-run.json
   run_json "$resource" delete dry_id --dry-run >/tmp/koban-"$resource"-delete-dry-run.json

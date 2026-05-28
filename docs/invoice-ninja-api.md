@@ -158,6 +158,10 @@ The resource set includes `clients`, `invoices`, `payments`, `quotes`,
 `companies`, `company-gateways`, `company-ledger`, `company-users`, `tokens`,
 `webhooks`, `imports`, `subscriptions`, and `client-gateway-tokens`.
 
+Inspect-only/high-risk resources `activities`, `system-logs`, `company-ledger`,
+and `imports` expose only `list` and `show`. They intentionally do not expose
+the generic write command family.
+
 The `create` and `edit` routes above return blank/default or editable objects;
 they are read-only `GET` routes despite their names. Koban exposes them as
 `template` and `edit-template` commands for schema discovery instead of
@@ -284,6 +288,8 @@ The current implementation is a guarded API foundation:
 Safety rules for this milestone:
 
 - Read commands and downloads issue `GET` requests.
+- Inspect-only/high-risk resources stay list/show-only until Koban adds
+  resource-specific safe write workflows.
 - Write commands require explicit payloads, `--dry-run` previews, and
   `--yes` where the mutation is destructive or externally visible.
 - No automatic pagination across multiple pages unless `--all` is explicit.
