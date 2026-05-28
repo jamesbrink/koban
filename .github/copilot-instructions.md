@@ -14,8 +14,8 @@ is intentionally a symlink to `AGENTS.md`; do not replace it with a copied file.
 - `src/cli.rs` owns clap command definitions and help/completion metadata.
 - `src/api.rs`, `src/config.rs`, and `src/error.rs` own HTTP, environment
   configuration, and diagnostics.
-- `src/commands.rs`, `src/invoice.rs`, and `src/render.rs` own dispatch,
-  invoice payload/safety helpers, and output shaping.
+- `src/commands.rs`, `src/invoice.rs`, `src/payload.rs`, and `src/render.rs`
+  own dispatch, payload/safety helpers, and output shaping.
 - `src/update.rs` owns direct release-tarball self-update behavior.
 - `tests/cli_tests.rs` and `tests/completions_tests.rs` cover user-facing CLI
   behavior.
@@ -24,17 +24,18 @@ is intentionally a symlink to `AGENTS.md`; do not replace it with a copied file.
 
 ## Safety
 
-The implemented Invoice Ninja API surface is read-first, with guarded invoice
-write commands. Invoice download commands may save PDF bytes to explicit local
-paths, but must still use `GET`.
+The implemented Invoice Ninja API surface spans the official resource families
+with guarded write commands. Download commands may save bytes to explicit local
+paths, but must still use read routes.
 
 Prefer the public demo API for live smoke tests:
 `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
-`INVOICE_NINJA_API_TOKEN=TOKEN`. Invoice write commands must keep `--dry-run`
-previews and `--yes` confirmation gates for destructive or externally visible
-mutations. Do not add or smoke test unimplemented write families in any
-environment unless that support has been explicitly implemented and reviewed.
-Prefer mocked API tests for command behavior.
+`INVOICE_NINJA_API_TOKEN=TOKEN`. Write commands must keep `--dry-run` previews
+and `--yes` confirmation gates for destructive or externally visible mutations.
+Do not live-smoke high-risk endpoints such as imports, purges, refunds, merges,
+scheduler, support, or admin utility routes unless the helper is demo-only,
+opt-in, and cleans up its own fixtures. Prefer mocked API tests for command
+behavior.
 
 Use `INVOICE_NINJA_API_TOKEN` and optional `INVOICE_NINJA_BASE_URL` for config.
 Redact tokens from errors, traces, fixtures, and docs.

@@ -1,14 +1,11 @@
-use std::{
-    fs,
-    io::{self, Read},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use serde_json::{Value, json};
 
 use crate::{
     KobanError, Result,
     cli::{InvoicePayloadArgs, InvoiceTriggerArgs, WriteSafetyArgs},
+    payload::{insert_string, parse_json_payload, parse_scalar},
 };
 
 pub(crate) fn require_confirmation(operation: &str, safety: &WriteSafetyArgs) -> Result<()> {
@@ -62,22 +59,22 @@ pub(crate) fn invoice_payload(
     }
 
     if let Some(data) = args.data {
-        return parse_json_payload(&data);
+        return parse_json_payload(&data, "invoice payload");
     }
     if let Some(path) = args.data_file {
-        let data = fs::read_to_string(&path).map_err(|source| KobanError::InvalidPayload {
+        let data = std::fs::read_to_string(&path).map_err(|source| KobanError::InvalidPayload {
             message: format!("could not read {}: {source}", path.display()),
         })?;
-        return parse_json_payload(&data);
+        return parse_json_payload(&data, "invoice payload");
     }
     if args.stdin {
         let mut data = String::new();
-        io::stdin()
-            .read_to_string(&mut data)
-            .map_err(|source| KobanError::InvalidPayload {
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut data).map_err(|source| {
+            KobanError::InvalidPayload {
                 message: format!("could not read standard input: {source}"),
-            })?;
-        return parse_json_payload(&data);
+            }
+        })?;
+        return parse_json_payload(&data, "invoice payload");
     }
 
     if has_guided {
@@ -98,19 +95,6 @@ pub(crate) fn invoice_payload(
                 .to_string(),
         })
     }
-}
-
-pub(crate) fn parse_json_payload(data: &str) -> Result<Value> {
-    let value =
-        serde_json::from_str::<Value>(data).map_err(|source| KobanError::InvalidPayload {
-            message: format!("JSON could not be parsed: {source}"),
-        })?;
-    if !value.is_object() {
-        return Err(KobanError::InvalidPayload {
-            message: "invoice payload must be a JSON object".to_string(),
-        });
-    }
-    Ok(value)
 }
 
 pub(crate) fn guided_invoice_payload(args: InvoicePayloadArgs) -> Result<Value> {
@@ -138,12 +122,6 @@ pub(crate) fn guided_invoice_payload(args: InvoicePayloadArgs) -> Result<Value> 
     Ok(Value::Object(body))
 }
 
-fn insert_string(map: &mut serde_json::Map<String, Value>, key: &str, value: Option<String>) {
-    if let Some(value) = value {
-        map.insert(key.to_string(), Value::String(value));
-    }
-}
-
 pub(crate) fn parse_line_item(input: &str) -> Result<Value> {
     let mut item = serde_json::Map::new();
     for part in input.split(',') {
@@ -168,20 +146,6 @@ pub(crate) fn parse_line_item(input: &str) -> Result<Value> {
     }
 
     Ok(Value::Object(item))
-}
-
-pub(crate) fn parse_scalar(value: &str) -> Value {
-    if value.eq_ignore_ascii_case("true") {
-        Value::Bool(true)
-    } else if value.eq_ignore_ascii_case("false") {
-        Value::Bool(false)
-    } else if value.eq_ignore_ascii_case("null") {
-        Value::Null
-    } else if let Ok(number) = value.parse::<serde_json::Number>() {
-        Value::Number(number)
-    } else {
-        Value::String(value.to_string())
-    }
 }
 
 impl InvoicePayloadArgs {
@@ -213,11 +177,7 @@ impl InvoiceTriggerArgs {
     }
 
     pub(crate) fn requires_confirmation(&self) -> bool {
-        self.send_email
-            || self.paid
-            || self.amount_paid.is_some()
-            || self.cancel
-            || self.retry_e_send
+        self.has_any()
     }
 }
 

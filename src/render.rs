@@ -20,28 +20,39 @@ pub fn render_value(
 
 pub(crate) fn render_table(resource: Option<Resource>, value: &Value) -> String {
     if resource.is_none() {
+        if value.get("data").is_some() {
+            return render_rows(None, value);
+        }
         return render_statics_table(value);
     }
 
+    render_rows(resource, value)
+}
+
+fn render_rows(resource: Option<Resource>, value: &Value) -> String {
     let rows = response_rows(value)
         .into_iter()
-        .map(
-            |item| match resource.expect("statics are rendered before resource row dispatch") {
-                Resource::Clients => Row::client(item),
-                Resource::Invoices => Row::invoice(item),
-                Resource::Payments => Row::payment(item),
-                Resource::Quotes => Row::quote(item),
-                Resource::Credits => Row::credit(item),
-                Resource::Vendors => Row::vendor(item),
-                Resource::Expenses => Row::expense(item),
-                Resource::Projects => Row::project(item),
-                Resource::Tasks => Row::task(item),
-            },
-        )
+        .map(|item| match resource {
+            Some(Resource::Clients) => Row::client(item),
+            Some(Resource::Invoices) => Row::invoice(item),
+            Some(Resource::Payments) => Row::payment(item),
+            Some(Resource::Quotes) => Row::quote(item),
+            Some(Resource::Credits) => Row::credit(item),
+            Some(Resource::Vendors) => Row::vendor(item),
+            Some(Resource::Expenses) => Row::expense(item),
+            Some(Resource::Projects) => Row::project(item),
+            Some(Resource::Tasks) => Row::task(item),
+            Some(Resource::Products) => Row::product(item),
+            Some(Resource::PurchaseOrders) => Row::purchase_order(item),
+            Some(Resource::RecurringInvoices) => Row::invoice_like(item),
+            Some(Resource::RecurringExpenses) => Row::expense(item),
+            Some(Resource::BankTransactions) => Row::bank_transaction(item),
+            Some(_) | None => Row::generic(item),
+        })
         .collect::<Vec<_>>();
 
     if rows.is_empty() {
-        return format!("No {} found.", resource.map_or("records", Resource::path));
+        return format!("No {} found.", resource.map_or("records", Resource::label));
     }
 
     let mut table = Table::new(rows);
@@ -275,6 +286,82 @@ impl Row {
             amount: field(value, &["time"]),
             balance: dash(),
             date: first_date_field(value, &[&["date"], &["created_at"]]),
+        }
+    }
+
+    fn product(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["product_key"]),
+            name: first_field(value, &[&["notes"], &["name"], &["custom_value1"]]),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: first_field(value, &[&["price"], &["cost"]]),
+            balance: dash(),
+            date: date_field(value, &["created_at"]),
+        }
+    }
+
+    fn purchase_order(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: field(value, &["number"]),
+            name: first_field(
+                value,
+                &[
+                    &["vendor", "display_name"],
+                    &["vendor", "name"],
+                    &["vendor_id"],
+                ],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: field(value, &["amount"]),
+            balance: field(value, &["balance"]),
+            date: first_date_field(value, &[&["due_date"], &["date"], &["created_at"]]),
+        }
+    }
+
+    fn invoice_like(value: &Value) -> Self {
+        let mut row = Self::invoice(value);
+        row.status = first_field(value, &[&["status"], &["status_id"], &["frequency_id"]]);
+        row
+    }
+
+    fn bank_transaction(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: first_field(value, &[&["transaction_id"], &["number"]]),
+            name: first_field(
+                value,
+                &[&["description"], &["bank_account_id"], &["vendor_id"]],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"]]),
+            amount: field(value, &["amount"]),
+            balance: field(value, &["balance"]),
+            date: first_date_field(value, &[&["date"], &["created_at"]]),
+        }
+    }
+
+    fn generic(value: &Value) -> Self {
+        Self {
+            id: field(value, &["id"]),
+            number: first_field(
+                value,
+                &[&["number"], &["name"], &["key"], &["token"], &["email"]],
+            ),
+            name: first_field(
+                value,
+                &[
+                    &["display_name"],
+                    &["name"],
+                    &["description"],
+                    &["email"],
+                    &["title"],
+                ],
+            ),
+            status: first_field(value, &[&["status"], &["status_id"], &["is_deleted"]]),
+            amount: first_field(value, &[&["amount"], &["balance"], &["price"]]),
+            balance: field(value, &["balance"]),
+            date: first_date_field(value, &[&["date"], &["updated_at"], &["created_at"]]),
         }
     }
 }

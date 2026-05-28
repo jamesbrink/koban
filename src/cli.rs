@@ -15,13 +15,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 Examples:
   koban statics --output json
   koban clients list --page 1 --per-page 20
-  koban clients show <client_id> --output json
-  koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
+  koban products create --name Consulting --price 100 --dry-run
   koban invoices update <invoice_id> --data-file invoice.json --dry-run
-  koban invoices delete <invoice_id> --yes
-  koban invoices download <invitation_key> --output-file invoice.pdf
-  koban invoices template --output json
-  koban invoices edit-template <invoice_id> --output json
+  koban search run --field query=acme --dry-run
   koban update --check
 
 Environment:
@@ -121,6 +117,130 @@ Examples:
     #[command(subcommand)]
     Tasks(ResourceCommand),
 
+    /// List, show, and manage locations
+    #[command(subcommand)]
+    Locations(ResourceCommand),
+
+    /// List, show, and manage products
+    #[command(subcommand)]
+    Products(ResourceCommand),
+
+    /// List, show, and manage recurring invoices
+    #[command(name = "recurring-invoices", subcommand)]
+    RecurringInvoices(ResourceCommand),
+
+    /// List, show, and manage purchase orders
+    #[command(name = "purchase-orders", subcommand)]
+    PurchaseOrders(ResourceCommand),
+
+    /// List, show, and manage recurring expenses
+    #[command(name = "recurring-expenses", subcommand)]
+    RecurringExpenses(ResourceCommand),
+
+    /// List, show, and manage bank transactions
+    #[command(name = "bank-transactions", subcommand)]
+    BankTransactions(ResourceCommand),
+
+    /// List, show, and manage bank integrations
+    #[command(name = "bank-integrations", subcommand)]
+    BankIntegrations(ResourceCommand),
+
+    /// List, show, and manage bank transaction rules
+    #[command(name = "bank-transaction-rules", subcommand)]
+    BankTransactionRules(ResourceCommand),
+
+    /// List, show, and manage expense categories
+    #[command(name = "expense-categories", subcommand)]
+    ExpenseCategories(ResourceCommand),
+
+    /// List, show, and manage tax rates
+    #[command(name = "tax-rates", subcommand)]
+    TaxRates(ResourceCommand),
+
+    /// List, show, and manage payment terms
+    #[command(name = "payment-terms", subcommand)]
+    PaymentTerms(ResourceCommand),
+
+    /// List, show, and manage task statuses
+    #[command(name = "task-statuses", subcommand)]
+    TaskStatuses(ResourceCommand),
+
+    /// List, show, and inspect activities
+    #[command(subcommand)]
+    Activities(InspectResourceCommand),
+
+    /// List, show, and inspect system logs
+    #[command(name = "system-logs", subcommand)]
+    SystemLogs(InspectResourceCommand),
+
+    /// List, show, and manage documents
+    #[command(subcommand)]
+    Documents(ResourceCommand),
+
+    /// List, show, and manage designs
+    #[command(subcommand)]
+    Designs(ResourceCommand),
+
+    /// List, show, and manage templates
+    #[command(subcommand)]
+    Templates(ResourceCommand),
+
+    /// List, show, and manage users
+    #[command(subcommand)]
+    Users(ResourceCommand),
+
+    /// List, show, and manage companies
+    #[command(subcommand)]
+    Companies(ResourceCommand),
+
+    /// List, show, and manage company gateways
+    #[command(name = "company-gateways", subcommand)]
+    CompanyGateways(ResourceCommand),
+
+    /// List and inspect company ledger entries
+    #[command(name = "company-ledger", subcommand)]
+    CompanyLedger(InspectResourceCommand),
+
+    /// List, show, and manage company users
+    #[command(name = "company-users", subcommand)]
+    CompanyUsers(ResourceCommand),
+
+    /// List, show, and manage API tokens
+    #[command(subcommand)]
+    Tokens(ResourceCommand),
+
+    /// List, show, and manage webhooks
+    #[command(subcommand)]
+    Webhooks(ResourceCommand),
+
+    /// List and inspect imports
+    #[command(subcommand)]
+    Imports(InspectResourceCommand),
+
+    /// List, show, and manage subscriptions
+    #[command(subcommand)]
+    Subscriptions(ResourceCommand),
+
+    /// List, show, and manage client gateway tokens
+    #[command(name = "client-gateway-tokens", subcommand)]
+    ClientGatewayTokens(ResourceCommand),
+
+    /// Query reports
+    #[command(subcommand)]
+    Reports(EndpointCommand),
+
+    /// Query charts
+    #[command(subcommand)]
+    Charts(EndpointCommand),
+
+    /// Search across Invoice Ninja records
+    #[command(subcommand)]
+    Search(EndpointCommand),
+
+    /// Call utility endpoints such as ping, health-check, refresh, and preview
+    #[command(subcommand)]
+    Utility(EndpointCommand),
+
     /// Check or install GitHub release updates
     #[command(after_long_help = "\
 Upgrade koban in place when installed from a release tarball. For other install
@@ -210,6 +330,36 @@ Examples:
   koban payments edit-template k9avmeG1P0"
     )]
     EditTemplate(ShowArgs),
+
+    /// Create a record from guided fields or JSON
+    Create(ResourceWriteArgs),
+
+    /// Update a record by hashed ID
+    Update(UpdateResourceArgs),
+
+    /// Delete a record by hashed ID
+    Delete(ConfirmableIdArgs),
+
+    /// Run a bulk resource action
+    Bulk(BulkArgs),
+
+    /// Upload documents to a resource
+    Upload(UploadArgs),
+
+    /// Run a custom resource action
+    Action(ResourceActionArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum InspectResourceCommand {
+    List(ListArgs),
+    Show(ShowArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum EndpointCommand {
+    /// Send a read-like POST or GET request to a named endpoint
+    Run(EndpointArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -357,6 +507,170 @@ pub struct TemplateArgs {
     /// Related resources to include, comma-separated; repeatable
     #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
     pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct ResourceWriteArgs {
+    #[command(flatten)]
+    pub payload: ResourcePayloadArgs,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct UpdateResourceArgs {
+    /// Invoice Ninja hashed ID
+    pub id: String,
+
+    #[command(flatten)]
+    pub payload: ResourcePayloadArgs,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct ResourcePayloadArgs {
+    /// Raw JSON payload
+    #[arg(long, value_name = "JSON", conflicts_with_all = ["data_file", "stdin"])]
+    pub data: Option<String>,
+
+    /// Read JSON payload from a file
+    #[arg(long = "data-file", value_name = "PATH", conflicts_with_all = ["data", "stdin"])]
+    pub data_file: Option<PathBuf>,
+
+    /// Read JSON payload from standard input
+    #[arg(long, conflicts_with_all = ["data", "data_file"])]
+    pub stdin: bool,
+
+    /// Set any payload field as key=value; quote values to force JSON strings
+    #[arg(long = "field", value_name = "key=value", action = clap::ArgAction::Append)]
+    pub fields: Vec<String>,
+
+    /// Display or company name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Record number
+    #[arg(long)]
+    pub number: Option<String>,
+
+    /// Client hashed ID
+    #[arg(long)]
+    pub client_id: Option<String>,
+
+    /// Vendor hashed ID
+    #[arg(long)]
+    pub vendor_id: Option<String>,
+
+    /// Project hashed ID
+    #[arg(long)]
+    pub project_id: Option<String>,
+
+    /// Date, usually YYYY-MM-DD
+    #[arg(long)]
+    pub date: Option<String>,
+
+    /// Due date, usually YYYY-MM-DD
+    #[arg(long)]
+    pub due_date: Option<String>,
+
+    /// Amount or rate
+    #[arg(long)]
+    pub amount: Option<String>,
+
+    /// Price for product-like records
+    #[arg(long)]
+    pub price: Option<String>,
+
+    /// Quantity for product-like or document-like records
+    #[arg(long)]
+    pub quantity: Option<String>,
+
+    /// Public client-facing notes
+    #[arg(long)]
+    pub public_notes: Option<String>,
+
+    /// Private internal notes
+    #[arg(long)]
+    pub private_notes: Option<String>,
+
+    /// Line item as comma-separated key=value pairs; repeatable
+    #[arg(long = "line-item", value_name = "key=value,...", action = clap::ArgAction::Append)]
+    pub line_items: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct ResourceActionArgs {
+    /// Invoice Ninja hashed ID
+    pub id: String,
+
+    /// Action path segment, such as archive, restore, email, convert, start, or stop
+    #[arg(long)]
+    pub action: String,
+
+    #[command(flatten)]
+    pub payload: ResourcePayloadArgs,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct EndpointArgs {
+    /// Endpoint path under /api/v1, such as search, reports, ping, or preview
+    #[arg(long)]
+    pub endpoint: Option<String>,
+
+    /// HTTP method to use
+    #[arg(long, value_enum)]
+    pub method: Option<HttpMethod>,
+
+    #[command(flatten)]
+    pub payload: ResourcePayloadArgs,
+
+    #[command(flatten)]
+    pub safety: WriteSafetyArgs,
+
+    /// Related resources to include, comma-separated; repeatable
+    #[arg(long, value_name = "name[,name]", value_delimiter = ',', action = clap::ArgAction::Append)]
+    pub include: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
+pub enum HttpMethod {
+    /// GET request
+    Get,
+    /// POST request
+    Post,
+    /// PUT request
+    Put,
+    /// DELETE request
+    Delete,
+}
+
+impl HttpMethod {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Get => "GET",
+            Self::Post => "POST",
+            Self::Put => "PUT",
+            Self::Delete => "DELETE",
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -508,7 +822,7 @@ pub struct InvoiceTriggerArgs {
 
 #[derive(Debug, Args)]
 pub struct WriteSafetyArgs {
-    /// Print the request that would be sent without calling Invoice Ninja
+    /// Print the JSON request preview without calling Invoice Ninja
     #[arg(long)]
     pub dry_run: bool,
 
@@ -557,7 +871,6 @@ pub struct UploadArgs {
     /// Invoice Ninja hashed ID
     pub id: String,
 
-    /// File to upload; repeatable
     #[arg(long = "file", value_name = "PATH", action = clap::ArgAction::Append, required = true)]
     pub files: Vec<PathBuf>,
 

@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod error;
 mod invoice;
+mod payload;
 mod render;
 mod resource;
 mod update;
@@ -18,8 +19,8 @@ pub use api::ApiClient;
 pub use cli::{
     BulkArgs, Cli, Commands, CompletionShell, ConfirmableIdArgs, DownloadArgs, InvoiceActionArgs,
     InvoiceCommand, InvoicePayloadArgs, InvoiceTriggerArgs, InvoiceWriteArgs, ListArgs,
-    OutputFormat, ResourceCommand, ShowArgs, TemplateArgs, UpdateInvoiceArgs, UploadArgs,
-    WriteSafetyArgs,
+    OutputFormat, ResourceActionArgs, ResourceCommand, ResourcePayloadArgs, ResourceWriteArgs,
+    ShowArgs, TemplateArgs, UpdateInvoiceArgs, UpdateResourceArgs, UploadArgs, WriteSafetyArgs,
 };
 pub use commands::{execute, execute_with_config};
 pub use config::{API_TOKEN_ENV, BASE_URL_ENV, Config, DEFAULT_BASE_URL};

@@ -18,11 +18,9 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Invoice Ninja"))
+        .stdout(predicate::str::contains("List, show, and inspect clients"))
         .stdout(predicate::str::contains(
-            "clients      List, show, and inspect clients",
-        ))
-        .stdout(predicate::str::contains(
-            "invoices     List, show, create, update, and manage invoices",
+            "List, show, create, update, and manage invoices",
         ))
         .stdout(predicate::str::contains("clients"))
         .stdout(predicate::str::contains("invoices"))
@@ -33,6 +31,11 @@ fn help_mentions_invoice_ninja_resources_and_completions() {
         .stdout(predicate::str::contains("expenses"))
         .stdout(predicate::str::contains("projects"))
         .stdout(predicate::str::contains("tasks"))
+        .stdout(predicate::str::contains("products"))
+        .stdout(predicate::str::contains("recurring-invoices"))
+        .stdout(predicate::str::contains("purchase-orders"))
+        .stdout(predicate::str::contains("webhooks"))
+        .stdout(predicate::str::contains("search"))
         .stdout(predicate::str::contains("update"))
         .stdout(predicate::str::contains("completions"));
 }
@@ -670,6 +673,7 @@ fn invoice_create_posts_guided_payload_and_trigger_query() {
             "--mark-sent",
             "--include",
             "client",
+            "--yes",
         ])
         .assert()
         .success()
@@ -680,24 +684,27 @@ fn invoice_create_posts_guided_payload_and_trigger_query() {
 }
 
 #[test]
-fn invoice_create_send_email_requires_confirmation() {
-    koban()
-        .env("INVOICE_NINJA_API_TOKEN", "test-token")
-        .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
-        .args([
-            "invoices",
-            "create",
-            "--client-id",
-            "client_1",
-            "--line-item",
-            "product_key=Consulting,quantity=1,cost=100",
-            "--send-email",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("confirmation required"))
-        .stderr(predicate::str::contains("--dry-run"))
-        .stderr(predicate::str::contains("--yes"));
+fn invoice_create_triggers_require_confirmation() {
+    for trigger in [
+        "--send-email",
+        "--mark-sent",
+        "--save-default-footer",
+        "--save-default-terms",
+    ] {
+        koban()
+            .env("INVOICE_NINJA_API_TOKEN", "test-token")
+            .env("INVOICE_NINJA_BASE_URL", "http://127.0.0.1:9")
+            .args(["invoices", "create", "--client-id", "client_1"])
+            .args([
+                "--line-item",
+                "product_key=Consulting,quantity=1,cost=100",
+                trigger,
+            ])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("confirmation required"))
+            .stderr(predicate::str::contains("--yes"));
+    }
 }
 
 #[test]
@@ -978,6 +985,41 @@ fn invoice_upload_puts_multipart_when_confirmed() {
         ])
         .arg(&file)
         .args(["--include", "documents", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"note.txt\""));
+
+    mock.assert();
+}
+
+#[test]
+fn generic_upload_posts_multipart_method_override_when_confirmed() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/clients/client_1/upload")
+            .body_includes("name=\"documents[]\"")
+            .header("X-API-TOKEN", "test-token");
+        then.status(200).json_body(json!({
+            "data": {
+                "id": "client_1",
+                "name": "Acme",
+                "documents": [{"name": "note.txt"}]
+            }
+        }));
+    });
+    let dir = tempdir().expect("tempdir");
+    let file = dir.path().join("note.txt");
+    std::fs::write(&file, "hello").expect("upload fixture");
+
+    koban()
+        .env("INVOICE_NINJA_API_TOKEN", "test-token")
+        .env("INVOICE_NINJA_BASE_URL", server.base_url())
+        .args([
+            "--output", "json", "clients", "upload", "client_1", "--file",
+        ])
+        .arg(&file)
+        .args(["--yes"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"note.txt\""));

@@ -6,17 +6,22 @@ use crate::{
     Cli, Commands, Config, KobanError, OutputFormat, Result,
     api::ApiClient,
     cli::{
-        BulkArgs, ConfirmableIdArgs, DownloadArgs, InvoiceActionArgs, InvoiceCommand,
-        InvoiceWriteArgs, ListArgs, ResourceCommand, UpdateInvoiceArgs, UploadArgs,
+        BulkArgs, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod,
+        InspectResourceCommand, InvoiceActionArgs, InvoiceCommand, InvoiceWriteArgs, ListArgs,
+        ResourceActionArgs, ResourceCommand, ResourceWriteArgs, UpdateInvoiceArgs,
+        UpdateResourceArgs, UploadArgs,
     },
     invoice::{
         invoice_payload, push_invoice_triggers, render_dry_run, require_confirmation,
         validate_invoice_triggers, validate_path_segment,
     },
+    payload::{merge_resource_action_payload, resource_payload},
     render::{render_value, response_rows},
     resource::Resource,
     update,
 };
+
+const FETCH_ALL_PAGE_CAP: u32 = 100;
 
 pub async fn execute(cli: Cli) -> Result<String> {
     let output = cli.output;
@@ -70,6 +75,99 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Tasks(command)) => {
             execute_resource(&client, output, Resource::Tasks, command).await
         }
+        Some(Commands::Locations(command)) => {
+            execute_resource(&client, output, Resource::Locations, command).await
+        }
+        Some(Commands::Products(command)) => {
+            execute_resource(&client, output, Resource::Products, command).await
+        }
+        Some(Commands::RecurringInvoices(command)) => {
+            execute_resource(&client, output, Resource::RecurringInvoices, command).await
+        }
+        Some(Commands::PurchaseOrders(command)) => {
+            execute_resource(&client, output, Resource::PurchaseOrders, command).await
+        }
+        Some(Commands::RecurringExpenses(command)) => {
+            execute_resource(&client, output, Resource::RecurringExpenses, command).await
+        }
+        Some(Commands::BankTransactions(command)) => {
+            execute_resource(&client, output, Resource::BankTransactions, command).await
+        }
+        Some(Commands::BankIntegrations(command)) => {
+            execute_resource(&client, output, Resource::BankIntegrations, command).await
+        }
+        Some(Commands::BankTransactionRules(command)) => {
+            execute_resource(&client, output, Resource::BankTransactionRules, command).await
+        }
+        Some(Commands::ExpenseCategories(command)) => {
+            execute_resource(&client, output, Resource::ExpenseCategories, command).await
+        }
+        Some(Commands::TaxRates(command)) => {
+            execute_resource(&client, output, Resource::TaxRates, command).await
+        }
+        Some(Commands::PaymentTerms(command)) => {
+            execute_resource(&client, output, Resource::PaymentTerms, command).await
+        }
+        Some(Commands::TaskStatuses(command)) => {
+            execute_resource(&client, output, Resource::TaskStatuses, command).await
+        }
+        Some(Commands::Activities(command)) => {
+            execute_inspect_resource(&client, output, Resource::Activities, command).await
+        }
+        Some(Commands::SystemLogs(command)) => {
+            execute_inspect_resource(&client, output, Resource::SystemLogs, command).await
+        }
+        Some(Commands::Documents(command)) => {
+            execute_resource(&client, output, Resource::Documents, command).await
+        }
+        Some(Commands::Designs(command)) => {
+            execute_resource(&client, output, Resource::Designs, command).await
+        }
+        Some(Commands::Templates(command)) => {
+            execute_resource(&client, output, Resource::Templates, command).await
+        }
+        Some(Commands::Users(command)) => {
+            execute_resource(&client, output, Resource::Users, command).await
+        }
+        Some(Commands::Companies(command)) => {
+            execute_resource(&client, output, Resource::Companies, command).await
+        }
+        Some(Commands::CompanyGateways(command)) => {
+            execute_resource(&client, output, Resource::CompanyGateways, command).await
+        }
+        Some(Commands::CompanyLedger(command)) => {
+            execute_inspect_resource(&client, output, Resource::CompanyLedger, command).await
+        }
+        Some(Commands::CompanyUsers(command)) => {
+            execute_resource(&client, output, Resource::CompanyUsers, command).await
+        }
+        Some(Commands::Tokens(command)) => {
+            execute_resource(&client, output, Resource::Tokens, command).await
+        }
+        Some(Commands::Webhooks(command)) => {
+            execute_resource(&client, output, Resource::Webhooks, command).await
+        }
+        Some(Commands::Imports(command)) => {
+            execute_inspect_resource(&client, output, Resource::Imports, command).await
+        }
+        Some(Commands::Subscriptions(command)) => {
+            execute_resource(&client, output, Resource::Subscriptions, command).await
+        }
+        Some(Commands::ClientGatewayTokens(command)) => {
+            execute_resource(&client, output, Resource::ClientGatewayTokens, command).await
+        }
+        Some(Commands::Reports(command)) => {
+            execute_endpoint(&client, output, "reports", command).await
+        }
+        Some(Commands::Charts(command)) => {
+            execute_endpoint(&client, output, "charts", command).await
+        }
+        Some(Commands::Search(command)) => {
+            execute_endpoint(&client, output, "search", command).await
+        }
+        Some(Commands::Utility(command)) => {
+            execute_endpoint(&client, output, "ping", command).await
+        }
         Some(Commands::Update {
             check,
             force,
@@ -118,7 +216,176 @@ async fn execute_resource(
                 .await?;
             render_value(output, Some(resource), &json)
         }
+        ResourceCommand::Create(args) => {
+            execute_resource_create(client, output, resource, args).await
+        }
+        ResourceCommand::Update(args) => {
+            execute_resource_update(client, output, resource, args).await
+        }
+        ResourceCommand::Delete(args) => {
+            execute_resource_delete(client, output, resource, args).await
+        }
+        ResourceCommand::Bulk(args) => execute_resource_bulk(client, output, resource, args).await,
+        ResourceCommand::Upload(args) => {
+            execute_resource_upload(client, output, resource, args).await
+        }
+        ResourceCommand::Action(args) => {
+            execute_resource_action(client, output, resource, args).await
+        }
     }
+}
+
+async fn execute_inspect_resource(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    command: InspectResourceCommand,
+) -> Result<String> {
+    let command = match command {
+        InspectResourceCommand::List(args) => ResourceCommand::List(args),
+        InspectResourceCommand::Show(args) => ResourceCommand::Show(args),
+    };
+    execute_resource(client, output, resource, command).await
+}
+
+async fn execute_resource_create(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: ResourceWriteArgs,
+) -> Result<String> {
+    let body = resource_payload(args.payload, true)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/{}", resource.path());
+
+    require_confirmation(&format!("{} create", resource.label()), &args.safety)?;
+
+    if args.safety.dry_run {
+        return render_dry_run("POST", &path, &query, Some(&body), None);
+    }
+
+    let json = client.post_json(&path, &query, &body).await?;
+    render_value(output, Some(resource), &json)
+}
+
+async fn execute_resource_update(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: UpdateResourceArgs,
+) -> Result<String> {
+    let body = resource_payload(args.payload, true)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/{}/{}", resource.path(), args.id);
+
+    require_confirmation(&format!("{} update", resource.label()), &args.safety)?;
+
+    if args.safety.dry_run {
+        return render_dry_run("PUT", &path, &query, Some(&body), None);
+    }
+
+    let json = client.put_json(&path, &query, &body).await?;
+    render_value(output, Some(resource), &json)
+}
+
+async fn execute_resource_delete(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: ConfirmableIdArgs,
+) -> Result<String> {
+    require_confirmation(&format!("{} delete", resource.label()), &args.safety)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/{}/{}", resource.path(), args.id);
+
+    if args.safety.dry_run {
+        return render_dry_run("DELETE", &path, &query, None, None);
+    }
+
+    let json = client.delete_json(&path, &query).await?;
+    render_value(output, Some(resource), &json)
+}
+
+async fn execute_resource_bulk(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: BulkArgs,
+) -> Result<String> {
+    require_confirmation(&format!("{} bulk action", resource.label()), &args.safety)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let body = bulk_action_body(args.action, args.ids, args.email_type);
+    let path = format!("api/v1/{}/bulk", resource.path());
+
+    if args.safety.dry_run {
+        return render_dry_run("POST", &path, &query, Some(&body), None);
+    }
+
+    let json = client.post_json(&path, &query, &body).await?;
+    render_value(output, Some(resource), &json)
+}
+
+async fn execute_resource_upload(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: UploadArgs,
+) -> Result<String> {
+    require_confirmation(
+        &format!("{} document upload", resource.label()),
+        &args.safety,
+    )?;
+    for file in &args.files {
+        ensure_upload_file(file)?;
+    }
+
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/{}/{}/upload", resource.path(), args.id);
+
+    if args.safety.dry_run {
+        return render_dry_run(
+            resource.upload_method(),
+            &path,
+            &query,
+            None,
+            Some(&args.files),
+        );
+    }
+
+    let json = if resource.upload_method() == "PUT" {
+        client.put_multipart(&path, &query, &args.files).await?
+    } else {
+        client.post_multipart(&path, &query, &args.files).await?
+    };
+    render_value(output, Some(resource), &json)
+}
+
+async fn execute_resource_action(
+    client: &ApiClient,
+    output: OutputFormat,
+    resource: Resource,
+    args: ResourceActionArgs,
+) -> Result<String> {
+    require_confirmation(&format!("{} action", resource.label()), &args.safety)?;
+    validate_path_segment("resource action", &args.action)?;
+    let body = resource_payload(args.payload, false)?;
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    let path = format!("api/v1/{}/bulk", resource.path());
+    let mut bulk_body = bulk_action_body(args.action, vec![args.id], None);
+    merge_resource_action_payload(&mut bulk_body, body);
+
+    if args.safety.dry_run {
+        return render_dry_run("POST", &path, &query, Some(&bulk_body), None);
+    }
+
+    let json = client.post_json(&path, &query, &bulk_body).await?;
+    render_value(output, Some(resource), &json)
 }
 
 async fn execute_invoice(
@@ -170,6 +437,87 @@ async fn execute_invoice(
     }
 }
 
+async fn execute_endpoint(
+    client: &ApiClient,
+    output: OutputFormat,
+    default_endpoint: &str,
+    command: crate::cli::EndpointCommand,
+) -> Result<String> {
+    match command {
+        crate::cli::EndpointCommand::Run(args) => {
+            execute_endpoint_run(client, output, default_endpoint, args).await
+        }
+    }
+}
+
+async fn execute_endpoint_run(
+    client: &ApiClient,
+    output: OutputFormat,
+    default_endpoint: &str,
+    args: EndpointArgs,
+) -> Result<String> {
+    let custom_endpoint = args.endpoint.is_some();
+    let endpoint = args
+        .endpoint
+        .unwrap_or_else(|| default_endpoint.to_string());
+    validate_endpoint_path(&endpoint)?;
+    let method = args
+        .method
+        .unwrap_or_else(|| default_method(default_endpoint));
+    if (default_endpoint == "ping" || custom_endpoint) && !matches!(method, HttpMethod::Get) {
+        return Err(KobanError::InvalidPayload {
+            message: "custom and utility endpoint runners are read-only; use --method get"
+                .to_string(),
+        });
+    }
+    let path = format!("api/v1/{endpoint}");
+    let body = resource_payload(
+        args.payload,
+        matches!(method, HttpMethod::Post | HttpMethod::Put),
+    )?;
+    let has_body = body.as_object().is_some_and(|body| !body.is_empty());
+    if has_body && matches!(method, HttpMethod::Get | HttpMethod::Delete) {
+        return Err(KobanError::InvalidPayload {
+            message: format!(
+                "{} endpoint commands do not send request bodies; use --method post or --method put for payload fields",
+                method.label()
+            ),
+        });
+    }
+    let mut query = Vec::new();
+    push_include(&mut query, args.include);
+    if args.safety.dry_run {
+        return render_dry_run(
+            method.label(),
+            &path,
+            &query,
+            has_body.then_some(&body),
+            None,
+        );
+    }
+
+    if !matches!(method, HttpMethod::Get) {
+        let action = format!("endpoint {}", method.label().to_ascii_lowercase());
+        require_confirmation(&action, &args.safety)?;
+    }
+
+    let json = match method {
+        HttpMethod::Get => client.get_json(&path, &query).await?,
+        HttpMethod::Post => client.post_json(&path, &query, &body).await?,
+        HttpMethod::Put => client.put_json(&path, &query, &body).await?,
+        HttpMethod::Delete => client.delete_json(&path, &query).await?,
+    };
+    render_value(output, None, &json)
+}
+
+fn default_method(default_endpoint: &str) -> HttpMethod {
+    if default_endpoint == "ping" {
+        HttpMethod::Get
+    } else {
+        HttpMethod::Post
+    }
+}
+
 async fn execute_list(
     client: &ApiClient,
     output: OutputFormat,
@@ -217,10 +565,7 @@ async fn execute_invoice_create(
     push_invoice_triggers(&mut query, &args.triggers);
 
     if args.triggers.requires_confirmation() {
-        require_confirmation(
-            "invoice create with email, paid, cancel, or retry action",
-            &args.safety,
-        )?;
+        require_confirmation("invoice create with state-changing trigger", &args.safety)?;
     }
 
     if args.safety.dry_run {
@@ -243,10 +588,7 @@ async fn execute_invoice_update(
     push_invoice_triggers(&mut query, &args.triggers);
 
     if args.triggers.requires_confirmation() {
-        require_confirmation(
-            "invoice update with email, paid, cancel, or retry action",
-            &args.safety,
-        )?;
+        require_confirmation("invoice update with state-changing trigger", &args.safety)?;
     }
 
     let path = format!("api/v1/invoices/{}", args.id);
@@ -284,17 +626,7 @@ async fn execute_invoice_bulk(
     require_confirmation("invoice bulk action", &args.safety)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-
-    let mut body = serde_json::Map::new();
-    body.insert("action".to_string(), Value::String(args.action));
-    body.insert(
-        "ids".to_string(),
-        Value::Array(args.ids.into_iter().map(Value::String).collect()),
-    );
-    if let Some(email_type) = args.email_type {
-        body.insert("email_type".to_string(), Value::String(email_type));
-    }
-    let body = Value::Object(body);
+    let body = bulk_action_body(args.action, args.ids, args.email_type);
 
     if args.safety.dry_run {
         return render_dry_run("POST", "api/v1/invoices/bulk", &query, Some(&body), None);
@@ -304,6 +636,19 @@ async fn execute_invoice_bulk(
         .post_json("api/v1/invoices/bulk", &query, &body)
         .await?;
     render_value(output, Some(Resource::Invoices), &json)
+}
+
+fn bulk_action_body(action: String, ids: Vec<String>, email_type: Option<String>) -> Value {
+    let mut body = serde_json::Map::new();
+    body.insert("action".to_string(), Value::String(action));
+    body.insert(
+        "ids".to_string(),
+        Value::Array(ids.into_iter().map(Value::String).collect()),
+    );
+    if let Some(email_type) = email_type {
+        body.insert("email_type".to_string(), Value::String(email_type));
+    }
+    Value::Object(body)
 }
 
 async fn execute_invoice_upload(
@@ -376,6 +721,7 @@ async fn fetch_all_pages(
 ) -> Result<Value> {
     let mut page = start_page;
     let mut pages_fetched = 0_u32;
+    let mut page_cap_reached = false;
     let mut rows = Vec::new();
 
     loop {
@@ -403,6 +749,10 @@ async fn fetch_all_pages(
         if page_len < per_page as usize || limit.is_some_and(|limit| rows.len() >= limit as usize) {
             break;
         }
+        if pages_fetched >= FETCH_ALL_PAGE_CAP {
+            page_cap_reached = true;
+            break;
+        }
         page += 1;
     }
 
@@ -410,6 +760,8 @@ async fn fetch_all_pages(
         "data": rows,
         "meta": {
             "pages_fetched": pages_fetched,
+            "page_cap": FETCH_ALL_PAGE_CAP,
+            "page_cap_reached": page_cap_reached,
             "limit": limit,
         }
     }))
@@ -500,4 +852,21 @@ pub(crate) fn apply_limit_to_response(mut value: Value, limit: Option<u32>) -> V
     }
 
     value
+}
+
+fn validate_endpoint_path(path: &str) -> Result<()> {
+    let is_safe = !path.is_empty()
+        && !path.starts_with('/')
+        && !path.contains("..")
+        && path
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'/'));
+
+    if is_safe {
+        Ok(())
+    } else {
+        Err(KobanError::InvalidPayload {
+            message: "endpoint must be a relative /api/v1 path".to_string(),
+        })
+    }
 }

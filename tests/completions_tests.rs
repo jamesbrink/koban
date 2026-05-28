@@ -95,6 +95,11 @@ fn dynamic_root_completions_include_resources() {
         .stdout(predicate::str::contains("expenses"))
         .stdout(predicate::str::contains("projects"))
         .stdout(predicate::str::contains("tasks"))
+        .stdout(predicate::str::contains("products"))
+        .stdout(predicate::str::contains("recurring-invoices"))
+        .stdout(predicate::str::contains("purchase-orders"))
+        .stdout(predicate::str::contains("webhooks"))
+        .stdout(predicate::str::contains("search"))
         .stdout(predicate::str::contains("update"))
         .stdout(predicate::str::contains("completions"));
 }
@@ -111,6 +116,41 @@ fn dynamic_resource_completions_include_list_and_show() {
         .stdout(predicate::str::contains("show"))
         .stdout(predicate::str::contains("\ntemplate\n"))
         .stdout(predicate::str::contains("edit-template"));
+}
+
+#[test]
+fn dynamic_expanded_resource_completions_include_write_commands() {
+    koban()
+        .env("COMPLETE", "bash")
+        .env("_CLAP_COMPLETE_INDEX", "2")
+        .args(["--", "koban", "products", ""])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("create"))
+        .stdout(predicate::str::contains("update"))
+        .stdout(predicate::str::contains("delete"))
+        .stdout(predicate::str::contains("bulk"))
+        .stdout(predicate::str::contains("upload"))
+        .stdout(predicate::str::contains("action"));
+}
+
+#[test]
+fn dynamic_inspect_resource_completions_omit_write_commands() {
+    koban()
+        .env("COMPLETE", "bash")
+        .env("_CLAP_COMPLETE_INDEX", "2")
+        .args(["--", "koban", "imports", ""])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("show"))
+        .stdout(predicate::str::contains("create").not())
+        .stdout(predicate::str::contains("update").not())
+        .stdout(predicate::str::contains("delete").not())
+        .stdout(predicate::str::contains("bulk").not())
+        .stdout(predicate::str::contains("upload").not())
+        .stdout(predicate::str::contains("action").not());
 }
 
 #[test]

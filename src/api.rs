@@ -139,9 +139,49 @@ impl ApiClient {
         query: &[(String, String)],
         files: &[PathBuf],
     ) -> Result<Value> {
+        self.multipart(
+            reqwest::Method::PUT,
+            path,
+            query,
+            files,
+            None,
+            "documents[]",
+        )
+        .await
+    }
+
+    pub async fn post_multipart(
+        &self,
+        path: &str,
+        query: &[(String, String)],
+        files: &[PathBuf],
+    ) -> Result<Value> {
+        self.multipart(
+            reqwest::Method::POST,
+            path,
+            query,
+            files,
+            None,
+            "documents[]",
+        )
+        .await
+    }
+
+    async fn multipart(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        query: &[(String, String)],
+        files: &[PathBuf],
+        method_override: Option<&'static str>,
+        file_field: &'static str,
+    ) -> Result<Value> {
         let url = self.endpoint(path, query)?;
         let endpoint = endpoint_label(&url);
         let mut form = reqwest::multipart::Form::new();
+        if let Some(method_override) = method_override {
+            form = form.text("_method", method_override);
+        }
 
         for path in files {
             let bytes = fs::read(path).map_err(|source| KobanError::File {
@@ -152,12 +192,12 @@ impl ApiClient {
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "document".to_string());
             let part = reqwest::multipart::Part::bytes(bytes).file_name(file_name);
-            form = form.part("documents[]", part);
+            form = form.part(file_field, part);
         }
 
         let response = self
             .http
-            .put(url)
+            .request(method, url)
             .header("X-API-TOKEN", &self.config.api_token)
             .header("X-Requested-With", REQUESTED_WITH)
             .multipart(form)
@@ -260,8 +300,8 @@ fn first_json_string(value: &Value, path: &[&str]) -> Option<String> {
 }
 
 fn endpoint_label(url: &Url) -> String {
-    match url.query() {
-        Some(query) => format!("{}?{query}", url.path()),
-        None => url.path().to_string(),
-    }
+    let mut label = url.clone();
+    let _ = label.set_username("");
+    let _ = label.set_password(None);
+    label.as_str().to_string()
 }

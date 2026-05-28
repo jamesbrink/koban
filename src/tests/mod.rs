@@ -12,6 +12,7 @@ use crate::{
     cli::*,
     commands::*,
     invoice::*,
+    payload::*,
     render::*,
     *,
 };
@@ -20,6 +21,7 @@ mod api;
 mod commands;
 mod config;
 mod invoice;
+mod payload;
 mod render;
 fn empty_payload_args() -> InvoicePayloadArgs {
     InvoicePayloadArgs {
@@ -50,5 +52,27 @@ fn empty_trigger_args() -> InvoiceTriggerArgs {
         save_default_footer: false,
         save_default_terms: false,
         retry_e_send: false,
+    }
+}
+
+fn empty_resource_payload_args() -> ResourcePayloadArgs {
+    ResourcePayloadArgs {
+        data: None,
+        data_file: None,
+        stdin: false,
+        fields: Vec::new(),
+        name: None,
+        number: None,
+        client_id: None,
+        vendor_id: None,
+        project_id: None,
+        date: None,
+        due_date: None,
+        amount: None,
+        price: None,
+        quantity: None,
+        public_notes: None,
+        private_notes: None,
+        line_items: Vec::new(),
     }
 }

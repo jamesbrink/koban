@@ -7,8 +7,8 @@ shell completions.
 
 The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
 still early work: the CLI boots, reports its version, generates shell
-completions, exposes a growing Invoice Ninja API surface, and now includes
-guarded invoice write commands.
+completions, exposes a broad Invoice Ninja API surface, and includes guarded
+write commands.
 
 ## Install
 
@@ -49,8 +49,10 @@ koban completions fish
 koban completions nushell
 ```
 
-The implemented API commands cover read workflows across core resources and
-guarded invoice write workflows:
+The implemented API commands cover read workflows, guided/JSON writes,
+bulk/custom actions, and uploads across Invoice Ninja resource families.
+Invoice-specific PDF downloads remain first-class because their route shape is
+documented and invitation-key based:
 
 ```sh
 koban statics --output json
@@ -66,7 +68,7 @@ koban invoices edit-template <id> --output json
 koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
 koban invoices create --data-file invoice.json --include client
 koban invoices update <id> --data-file invoice.json --dry-run
-koban invoices update <id> --public-notes "Thanks again" --mark-sent
+koban invoices update <id> --public-notes "Thanks again" --mark-sent --yes
 koban invoices delete <id> --dry-run
 koban invoices delete <id> --yes
 koban invoices bulk --action archive --id <id> --id <id> --dry-run
@@ -102,7 +104,19 @@ koban tasks list
 koban tasks show <id>
 koban tasks template --output json
 koban tasks edit-template <id> --output json
+koban products create --name Consulting --price 100 --dry-run
+koban products update <id> --field notes="Hourly support" --dry-run
+koban products delete <id> --dry-run
+koban recurring-invoices action <id> --action start --dry-run
+koban search run --field query=acme --dry-run
+koban reports run --data-file report.json --dry-run
 ```
+
+Generic resource single-record actions are sent through Invoice Ninja's bulk
+action endpoint with a one-item `ids` list, matching the upstream API shape.
+Endpoint runner payload flags are accepted only for `POST` and `PUT`; `GET` and
+`DELETE` reject payloads so dry-runs cannot show a body that the live request
+would ignore.
 
 ## Invoice Ninja Direction
 
@@ -116,55 +130,44 @@ Authentication is token based. Requests require `X-API-TOKEN`, and the developer
 guide also documents `X-Requested-With: XMLHttpRequest` as a required security
 header. JSON write requests must send `Content-Type: application/json`.
 
-The implemented `koban` API surface is intentionally boring and durable:
+The implemented `koban` API surface is intentionally boring and durable. The
+core resource command shape is:
 
 ```text
 koban statics
-koban clients list
-koban clients show <id>
-koban clients template
-koban clients edit-template <id>
-koban invoices list
-koban invoices show <id>
-koban invoices template
-koban invoices edit-template <id>
-koban invoices create
-koban invoices update <id>
-koban invoices delete <id>
-koban invoices bulk
-koban invoices action <id>
-koban invoices upload <id>
+koban <resource> list
+koban <resource> show <id>
+koban <resource> template
+koban <resource> edit-template <id>
+koban <resource> create
+koban <resource> update <id>
+koban <resource> delete <id>
+koban <resource> bulk
+koban <resource> action <id>
+koban <resource> upload <id>
 koban invoices download <invitation_key>
 koban invoices delivery-note <id>
-koban payments list
-koban payments show <id>
-koban payments template
-koban payments edit-template <id>
-koban quotes list
-koban quotes show <id>
-koban quotes template
-koban quotes edit-template <id>
-koban credits list
-koban credits show <id>
-koban credits template
-koban credits edit-template <id>
-koban vendors list
-koban vendors show <id>
-koban vendors template
-koban vendors edit-template <id>
-koban expenses list
-koban expenses show <id>
-koban expenses template
-koban expenses edit-template <id>
-koban projects list
-koban projects show <id>
-koban projects template
-koban projects edit-template <id>
-koban tasks list
-koban tasks show <id>
-koban tasks template
-koban tasks edit-template <id>
+koban search run
+koban reports run
+koban charts run
+koban utility run
 ```
+
+Custom endpoint overrides are read-only and only send `GET` requests. Use
+first-class resource commands for mutations.
+
+`<resource>` includes `clients`, `invoices`, `payments`, `quotes`, `credits`,
+`vendors`, `expenses`, `projects`, `tasks`, `locations`, `products`,
+`recurring-invoices`, `purchase-orders`, `recurring-expenses`,
+`bank-transactions`, `bank-integrations`, `bank-transaction-rules`,
+`expense-categories`, `tax-rates`, `payment-terms`, `task-statuses`,
+`activities`, `system-logs`, `documents`, `designs`, `templates`, `users`,
+`companies`, `company-gateways`, `company-ledger`, `company-users`, `tokens`,
+`webhooks`, `imports`, `subscriptions`, and `client-gateway-tokens`.
+
+Inspect-only/high-risk groups `activities`, `system-logs`, `company-ledger`,
+and `imports` expose only `list` and `show`. They do not expose generic write
+commands.
 
 The `template` and `edit-template` commands use Invoice Ninja's read-only
 `GET /create` and `GET /{id}/edit` routes. They return default/editable payloads
@@ -177,10 +180,20 @@ koban clients list --filter balance=gt:1000 --filter name=Bob --sort 'name|desc'
 koban invoices list --all --limit 100 --output json
 ```
 
+`--all` stops after 100 pages to avoid accidental unbounded traversal. JSON
+output includes `meta.page_cap_reached` when that guardrail is hit.
+
 Invoice download commands also use read-only `GET` routes and write PDF bytes to
 explicit file paths. Existing files are not overwritten unless `--force` is set.
 
-Invoice write commands accept either one raw JSON source or guided flags:
+Write commands accept either one raw JSON source or guided flags. Resource
+writes expose broad guided fields such as `--name`, `--number`, `--client-id`,
+`--vendor-id`, `--project-id`, `--date`, `--due-date`, `--amount`, `--price`,
+`--quantity`, notes, repeatable `--field key=value`, and repeatable
+`--line-item key=value,...` for document-like resources. Raw JSON cannot be
+combined with guided fields or `--line-item`. Generic `--field` values parse
+JSON-like scalars (`true`, `false`, `null`, and numbers); quote a field value to
+force a JSON string, such as `--field number='"1000"'`.
 
 ```sh
 koban invoices create --data '{"client_id":"...","line_items":[]}' --dry-run
@@ -189,11 +202,17 @@ printf '%s' '{"public_notes":"Updated"}' | koban invoices update <id> --stdin
 koban invoices create --client-id <client_id> \
   --line-item product_key=Consulting,quantity=1,cost=100 \
   --dry-run
+koban products create --name Consulting --price 100 --dry-run
+koban clients create --field name=Acme --field contacts.email=ap@example.test --dry-run
 ```
 
-Risky mutations require `--yes` unless `--dry-run` is used. This includes
-invoice deletion, bulk actions, uploads, custom actions, sending email, paid
-state changes, cancellation, and retrying e-send.
+Generic resource create/update/delete/bulk/upload/action commands require
+`--yes` unless `--dry-run` is used. Generic endpoint runner defaults may use
+non-GET methods with `--yes`, but custom `--endpoint` overrides are GET-only.
+Invoice create/update keep
+their lighter workflow for ordinary draft edits, but require `--yes` when they
+mark sent, send email, mark paid, cancel, save default footer/terms, retry
+e-send, or otherwise cause externally visible state changes.
 
 ## Configuration Plan
 
@@ -218,11 +237,12 @@ export INVOICE_NINJA_API_TOKEN="TOKEN"
 ## Safety
 
 Read-only live smoke tests should use the public demo endpoint above by default.
-Invoice write support is implemented with `--dry-run` and `--yes` guardrails, but
-live write smoke tests must be explicit and should target the public demo API.
-Do not smoke test unimplemented write families such as client/payment writes,
-imports, purges, refunds, merges, or scheduler endpoints against any environment.
-Production or personal accounts should only be used for intentional checks.
+Write support is implemented with `--dry-run` and `--yes` guardrails, but live
+write smoke tests must be explicit and should target the public demo API.
+Purges, refunds, merges, imports, scheduler, and admin utility endpoints should
+only be exercised when a dedicated smoke helper creates and cleans up its own
+demo data. Production or personal accounts should only be used for intentional
+checks.
 
 ## Development
 
@@ -276,12 +296,18 @@ INVOICE_NINJA_API_TOKEN=TOKEN
 INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com
 ```
 
-The demo invoice write smoke helper is intentionally opt-in:
+The demo write smoke helpers are intentionally opt-in and hard-code the public
+demo API internally so they cannot inherit a production or personal endpoint:
 
 ```sh
 KOBAN_LIVE_WRITE_SMOKE=1 smoke-invoice-write-demo
 KOBAN_LIVE_WRITE_SMOKE=1 smoke-all-demo
 ```
+
+`smoke-all-demo` live-reads every resource that the public demo API exposes,
+allows documented demo-only 404s for unsupported reference pages, dry-runs every
+expanded resource write family, and performs a create/update/upload/action/
+download/bulk/delete invoice lifecycle with cleanup.
 
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on

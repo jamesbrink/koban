@@ -1,10 +1,10 @@
 # Invoice Ninja API Reference For Koban
 
 This document is Koban's working API reference. It is intentionally conservative
-because early development touches accounting APIs. Koban's implemented surface
-is read-first, with guarded invoice write commands. Prefer the public demo API
-for live smoke tests, and use production or personal accounts only for
-intentional checks.
+because development touches accounting APIs. Koban's implemented surface now
+spans the official resource families with guarded write commands. Prefer the
+public demo API for live smoke tests, and use production or personal accounts
+only for intentional checks.
 
 Last researched: 2026-05-28.
 
@@ -28,6 +28,10 @@ Last researched: 2026-05-28.
 - Search API: https://invoiceninja.github.io/docs/api-reference/search
 - Search endpoint: https://invoiceninja.github.io/docs/api-reference/post-search
 - Statics endpoint: https://invoiceninja.github.io/docs/api-reference/get-statics
+- Products API: https://invoiceninja.github.io/docs/api-reference/products
+- Recurring invoices API: https://invoiceninja.github.io/docs/api-reference/recurring-invoices
+- Purchase orders API: https://invoiceninja.github.io/docs/api-reference/purchase-orders
+- Recurring expenses API: https://invoiceninja.github.io/docs/api-reference/recurring-expenses
 
 ## API Shape
 
@@ -121,99 +125,85 @@ Implemented design:
 - List commands expose explicit `--page` and `--per-page` flags.
 - List commands expose repeatable raw `--filter key=value` flags and a raw
   `--sort field|direction` flag.
-- List commands expose `--all` and `--limit` for controlled pagination.
-- List/show/template/edit-template commands expose repeatable, comma-separated
-  `--include` flags.
+- List commands expose `--all` and `--limit` for controlled pagination. `--all`
+  stops after 100 pages and reports `meta.page_cap_reached` in JSON output.
+- List/show/template/edit-template/create/update/delete/bulk/upload/action
+  commands expose repeatable, comma-separated `--include` flags when useful.
 - Single-page JSON output preserves the API response. Multi-page JSON output uses
   a local `data` plus `meta.pages_fetched` envelope.
 - Avoid unbounded traversal unless the user explicitly passes `--all`.
 
-## High-Value Read-Only Endpoints
+## Implemented Resource Parity
 
-These are suitable for the first networked Koban milestone:
+Koban exposes the same command shape for the main resource-oriented API groups:
 
 ```text
-GET /api/v1/clients
-GET /api/v1/clients/{id}
-GET /api/v1/clients/{id}/edit
-GET /api/v1/clients/create
-
-GET /api/v1/invoices
-GET /api/v1/invoices/{id}
-GET /api/v1/invoices/{id}/edit
-GET /api/v1/invoices/create
-GET /api/v1/invoice/{invitation_key}/download
-GET /api/v1/invoices/{id}/delivery_note
-
-GET /api/v1/payments
-GET /api/v1/payments/{id}
-GET /api/v1/payments/{id}/edit
-GET /api/v1/payments/create
-
-GET /api/v1/quotes
-GET /api/v1/quotes/{id}
-GET /api/v1/quotes/{id}/edit
-GET /api/v1/quotes/create
-
-GET /api/v1/credits
-GET /api/v1/credits/{id}
-GET /api/v1/credits/{id}/edit
-GET /api/v1/credits/create
-
-GET /api/v1/vendors
-GET /api/v1/vendors/{id}
-GET /api/v1/vendors/{id}/edit
-GET /api/v1/vendors/create
-
-GET /api/v1/expenses
-GET /api/v1/expenses/{id}
-GET /api/v1/expenses/{id}/edit
-GET /api/v1/expenses/create
-
-GET /api/v1/projects
-GET /api/v1/projects/{id}
-GET /api/v1/projects/{id}/edit
-GET /api/v1/projects/create
-
-GET /api/v1/tasks
-GET /api/v1/tasks/{id}
-GET /api/v1/tasks/{id}/edit
-GET /api/v1/tasks/create
-
-GET /api/v1/statics
+koban <resource> list
+koban <resource> show <id>
+koban <resource> template
+koban <resource> edit-template <id>
+koban <resource> create
+koban <resource> update <id>
+koban <resource> delete <id>
+koban <resource> bulk
+koban <resource> upload <id>
+koban <resource> action <id>
 ```
+
+The resource set includes `clients`, `invoices`, `payments`, `quotes`,
+`credits`, `vendors`, `expenses`, `projects`, `tasks`, `locations`, `products`,
+`recurring-invoices`, `purchase-orders`, `recurring-expenses`,
+`bank-transactions`, `bank-integrations`, `bank-transaction-rules`,
+`expense-categories`, `tax-rates`, `payment-terms`, `task-statuses`,
+`activities`, `system-logs`, `documents`, `designs`, `templates`, `users`,
+`companies`, `company-gateways`, `company-ledger`, `company-users`, `tokens`,
+`webhooks`, `imports`, `subscriptions`, and `client-gateway-tokens`.
+
+Inspect-only/high-risk resources `activities`, `system-logs`, `company-ledger`,
+and `imports` expose only `list` and `show`. They intentionally do not expose
+the generic write command family.
 
 The `create` and `edit` routes above return blank/default or editable objects;
 they are read-only `GET` routes despite their names. Koban exposes them as
 `template` and `edit-template` commands for schema discovery instead of
 user-facing `create` or `edit` verbs.
 
-The search endpoint is useful, but it is a `POST`:
+Utility-style endpoints are exposed through endpoint runners:
 
 ```text
-POST /api/v1/search
+koban search run
+koban reports run
+koban charts run
+koban utility run
 ```
 
-Treat search as read-like but not part of the first live smoke test because it
-uses `POST`. Add it once Koban has a request body model, a `--dry-run`
-convention, and fixtures around token redaction.
+`search`, `reports`, and `charts` default to their matching endpoint names.
+Custom `--endpoint` overrides are read-only and only send `GET` requests.
+`utility run` defaults to `ping` and is always read-only.
 
-## Implemented Invoice Write Endpoints
+## Implemented Write Endpoints
 
-Invoice manipulation is the first implemented write family:
+Resource manipulation follows the official REST shape:
 
 ```text
-POST /api/v1/invoices
-PUT /api/v1/invoices/{id}
-DELETE /api/v1/invoices/{id}
-POST /api/v1/invoices/bulk
-PUT /api/v1/invoices/{id}/upload
-GET /api/v1/invoices/{id}/{action}
+POST /api/v1/{resource}
+PUT /api/v1/{resource}/{id}
+DELETE /api/v1/{resource}/{id}
+POST /api/v1/{resource}/bulk
+POST /api/v1/{resource}/{id}/upload
+POST /api/v1/{resource}/bulk   # single-record actions use a one-item ids list
 ```
 
 Create and update accept either one raw JSON source (`--data`, `--data-file`, or
-`--stdin`) or guided flags for common fields. Guided line items are repeatable
-`--line-item key=value,...` values and map to the API's `line_items` array.
+`--stdin`) or guided flags. Raw JSON cannot be combined with guided fields or
+`--line-item`. Generic guided flags cover common fields:
+`--name`, `--number`, `--client-id`, `--vendor-id`, `--project-id`, `--date`,
+`--due-date`, `--amount`, `--price`, `--quantity`, notes, repeatable
+`--field key=value`, and repeatable `--line-item key=value,...`. Generic
+`--field` values parse JSON-like scalars; quote a value to force a string.
+
+Invoice commands keep a specialized guided payload and trigger model for
+invoice-specific workflows:
 
 Invoice create/update may also send documented trigger query flags:
 
@@ -232,47 +222,37 @@ Koban intentionally does not expose the documented `redirect` trigger.
 
 Note: the interactive docs label invoice document upload as `POST`, but the
 public demo API currently accepts `PUT /api/v1/invoices/{id}/upload`; Koban uses
-the live-compatible method.
+the live-compatible method for invoices and `POST` for generic resource uploads.
+Multipart uploads use the `documents[]` form field so repeatable `--file`
+arguments are sent as an array.
 
 Safety rules:
 
-- Every invoice write supports `--dry-run`.
-- `delete`, `bulk`, `upload`, and `action` require `--yes` unless `--dry-run` is
-  used.
-- `create` and `update` require `--yes` when they send email, mark paid, record
-  an amount paid, cancel, or retry e-send.
+- Every write supports `--dry-run`.
+- Generic resource `create`, `update`, `delete`, `bulk`, `upload`, and `action`
+  commands require `--yes` unless `--dry-run` is used.
+- Generic endpoint runner defaults require `--yes` for non-GET methods unless
+  `--dry-run` is used. Custom `--endpoint` overrides are read-only.
+- `utility run` is read-only and rejects non-GET methods.
+- Generic endpoint runner payload flags are valid only with `POST` and `PUT`;
+  `GET` and `DELETE` reject payloads instead of silently dropping request
+  bodies.
+- `create` and `update` require `--yes` when invoice-specific triggers mark
+  sent, send email, mark paid, record an amount paid, cancel, save default
+  footer/terms, or retry e-send.
 - Mocked tests are required for every write path. Live write smoke tests must be
   explicitly opted in and should use the public demo endpoint.
 - `smoke-all-demo` is the repeatable full live smoke helper for the implemented
-  command families. It only runs when `KOBAN_LIVE_WRITE_SMOKE=1` and the
-  environment is set to the public demo URL with token `TOKEN`.
+  command families. It hard-codes the public demo URL and token internally,
+  live-reads every supported demo resource, dry-runs every expanded resource
+  write family, and only runs when `KOBAN_LIVE_WRITE_SMOKE=1`.
 
-## Write And Destructive Endpoints To Avoid For Now
+## High-Risk Endpoints
 
-Do not implement these until Koban has confirmation prompts, `--yes`, dry-run
-rendering, request validation, tests with a mock server, and clear docs:
-
-```text
-POST /api/v1/clients
-PUT /api/v1/clients/{id}
-DELETE /api/v1/clients/{id}
-POST /api/v1/clients/bulk
-POST /api/v1/clients/{id}/purge
-POST /api/v1/clients/{id}/{mergeable_client_hashed_id}/merge
-
-POST /api/v1/payments
-PUT /api/v1/payments/{id}
-DELETE /api/v1/payments/{id}
-POST /api/v1/payments/{id}/refund
-POST /api/v1/payments/bulk
-POST /api/v1/payments/{id}/upload
-```
-
-Some custom action endpoints may be harmless and others may send emails, archive
-records, reverse state, or otherwise mutate accounting data. Outside the
-implemented invoice action surface, treat all custom, bulk, upload, merge,
-purge, refund, email, import, and scheduler endpoints as unsafe until
-individually audited.
+Purge, merge, refund, import, scheduler, support, and admin utility endpoints
+can have irreversible side effects. Koban exposes the plumbing needed to call
+them, but live smoke tests for these paths must be demo-only, opt-in, and tied
+to fixtures that create and clean up their own records.
 
 ## Invoice Statuses
 
@@ -301,20 +281,24 @@ The current implementation is a guarded API foundation:
    `INVOICE_NINJA_API_TOKEN` and optional `INVOICE_NINJA_BASE_URL`.
 3. `koban statics` uses `GET /api/v1/statics` as the smallest authenticated
    smoke test, preferably against the public demo endpoint.
-4. Resource `list/show/template/edit-template` commands for clients, invoices,
-   payments, quotes, credits, vendors, expenses, projects, and tasks.
+4. Resource `list/show/template/edit-template/create/update/delete/bulk/upload/
+   action` commands across the documented resource families.
 5. List pagination with `--page`, `--per-page`, `--all`, and `--limit`.
 6. Raw filtering and sorting with `--filter key=value` and `--sort field|dir`.
 7. Read-only invoice PDF downloads for invoice PDFs and delivery notes.
-8. Guarded invoice create/update/delete/bulk/upload/action commands.
+8. Guarded write commands with generic guided payloads plus specialized invoice
+   create/update triggers.
 
 Safety rules for this milestone:
 
 - Read commands and downloads issue `GET` requests.
-- Invoice write commands require explicit payloads, `--dry-run` previews, and
+- Inspect-only/high-risk resources stay list/show-only until Koban adds
+  resource-specific safe write workflows.
+- Write commands require explicit payloads, `--dry-run` previews, and
   `--yes` where the mutation is destructive or externally visible.
 - No automatic pagination across multiple pages unless `--all` is explicit.
-- No imports, purge, refund, merge, scheduler, or unimplemented write families.
+- Imports, purge, refund, merge, scheduler, and admin utility live smoke tests
+  must be explicit and demo-only.
 - Live smoke tests should use the public demo endpoint by default:
   `https://demo.invoiceninja.com` with token `TOKEN`.
 - Production or personal accounts are acceptable only for intentional checks.
@@ -339,7 +323,7 @@ koban invoices edit-template <invoice_id> --output json
 koban invoices create --client-id <client_id> --line-item product_key=Consulting,quantity=1,cost=100 --dry-run
 koban invoices create --data-file invoice.json --include client
 koban invoices update <invoice_id> --data-file invoice.json --dry-run
-koban invoices update <invoice_id> --public-notes "Thanks again" --mark-sent
+koban invoices update <invoice_id> --public-notes "Thanks again" --mark-sent --yes
 koban invoices delete <invoice_id> --dry-run
 koban invoices delete <invoice_id> --yes
 koban invoices bulk --action archive --id <invoice_id> --id <invoice_id> --dry-run
@@ -351,6 +335,11 @@ koban payments list --page 1 --per-page 20 --output table
 koban payments show <payment_id> --output json
 koban payments template --output json
 koban payments edit-template <payment_id> --output json
+koban products create --name Consulting --price 100 --dry-run
+koban products update <product_id> --field notes="Hourly support" --dry-run
+koban recurring-invoices action <recurring_invoice_id> --action start --dry-run
+koban search run --field query=acme --dry-run
+koban reports run --data-file report.json --dry-run
 koban quotes list --output table
 koban credits show <credit_id> --output json
 koban vendors template --output json
@@ -358,6 +347,10 @@ koban expenses edit-template <expense_id> --output json
 koban projects list --filter client_id=<client_id>
 koban tasks list --all --limit 50
 ```
+
+Generic resource single-record actions are represented as
+`POST /api/v1/{resource}/bulk` with the requested action and a one-item `ids`
+list, matching the upstream controller shape used by lifecycle actions.
 
 ## Open Questions
 
@@ -369,5 +362,5 @@ koban tasks list --all --limit 50
   envelope?
 - Should statics be cached on disk, and if so where should Koban keep cache files
   on macOS/Linux?
-- Which write family should follow invoices: clients, quotes, payments, or
-  task/project time workflows?
+- Which guided fields should become resource-specific first-class flags beyond
+  the current common field set?

@@ -6,11 +6,11 @@ if [ "${KOBAN_LIVE_WRITE_SMOKE:-}" != "1" ]; then
   exit 2
 fi
 
-if [ "${INVOICE_NINJA_BASE_URL:-}" != "https://demo.invoiceninja.com" ] ||
-  [ "${INVOICE_NINJA_API_TOKEN:-}" != "TOKEN" ]; then
-  echo "This helper only runs against https://demo.invoiceninja.com with token TOKEN." >&2
-  exit 2
-fi
+readonly INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
+readonly INVOICE_NINJA_API_TOKEN="TOKEN"
+export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN
+
+echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
 run_json() {
   cargo run --quiet -- --output json "$@"
@@ -61,6 +61,71 @@ for resource in "${resources[@]}"; do
   echo "$resource template_type=$(jq -r "if .data then (.data|type) else type end" /tmp/koban-"$resource"-template.json)"
 done
 
+expanded_resources=(
+  locations products recurring-invoices purchase-orders recurring-expenses
+  bank-transactions bank-integrations bank-transaction-rules expense-categories
+  tax-rates payment-terms task-statuses activities system-logs documents
+  designs templates users companies company-gateways company-ledger
+  company-users tokens webhooks imports subscriptions client-gateway-tokens
+)
+expanded_write_resources=(
+  locations products recurring-invoices purchase-orders recurring-expenses
+  bank-transactions bank-integrations bank-transaction-rules expense-categories
+  tax-rates payment-terms task-statuses documents designs templates users
+  companies company-gateways company-users tokens webhooks subscriptions
+  client-gateway-tokens
+)
+demo_optional_404=(templates company-users imports)
+
+allows_demo_404() {
+  local resource="$1"
+  for optional in "${demo_optional_404[@]}"; do
+    if [ "$resource" = "$optional" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+allows_demo_show_skip() {
+  local resource="$1"
+  local status="$2"
+  case "$resource:$status" in
+    activities:HTTP_404 | designs:HTTP_401 | users:HTTP_412) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+echo "== expanded resource read commands =="
+for resource in "${expanded_resources[@]}"; do
+  echo "== $resource expanded read commands =="
+  if run_json "$resource" list --per-page 1 >/tmp/koban-"$resource"-list.json 2>/tmp/koban-"$resource"-list.err; then
+    row_count=$(jq ".data | length" /tmp/koban-"$resource"-list.json)
+    echo "$resource list_rows=$row_count"
+    id=$(jq -r ".data[0].id // empty" /tmp/koban-"$resource"-list.json)
+    if [ -n "$id" ]; then
+      if run_json "$resource" show "$id" >/tmp/koban-"$resource"-show.json 2>/tmp/koban-"$resource"-show.err; then
+        echo "$resource show_id=$(jq -r ".data.id // .id // empty" /tmp/koban-"$resource"-show.json)"
+      else
+        status=$(rg -o "HTTP [0-9]+" /tmp/koban-"$resource"-show.err | head -1 | tr ' ' '_' || true)
+        if allows_demo_show_skip "$resource" "$status"; then
+          echo "$resource show skipped=$status"
+        else
+          cat /tmp/koban-"$resource"-show.err >&2
+          exit 1
+        fi
+      fi
+    else
+      echo "$resource show skipped=no_rows"
+    fi
+  elif allows_demo_404 "$resource" && rg -q "HTTP 404" /tmp/koban-"$resource"-list.err; then
+    echo "$resource list skipped=demo_404"
+  else
+    cat /tmp/koban-"$resource"-list.err >&2
+    exit 1
+  fi
+done
+
 echo "== invoice write commands =="
 client_id=$(jq -r ".data[0].id // empty" /tmp/koban-clients-list.json)
 if [ -z "$client_id" ]; then
@@ -87,6 +152,21 @@ upload_dry_file=$(mktemp /tmp/koban-upload-dry.XXXXXX.txt)
 printf "dry upload\n" >"$upload_dry_file"
 run_json invoices upload dry_invoice --file "$upload_dry_file" --dry-run >/tmp/koban-upload-dry-run.json
 echo "upload_dry_run=$(jq -r .dry_run /tmp/koban-upload-dry-run.json) method=$(jq -r .method /tmp/koban-upload-dry-run.json)"
+
+echo "== expanded api dry-run commands =="
+for resource in "${expanded_write_resources[@]}"; do
+  run_json "$resource" create --name KobanSmoke --dry-run >/tmp/koban-"$resource"-create-dry-run.json
+  run_json "$resource" update dry_id --field notes=Updated --dry-run >/tmp/koban-"$resource"-update-dry-run.json
+  run_json "$resource" delete dry_id --dry-run >/tmp/koban-"$resource"-delete-dry-run.json
+  run_json "$resource" bulk --action archive --id dry_id --dry-run >/tmp/koban-"$resource"-bulk-dry-run.json
+  run_json "$resource" action dry_id --action archive --dry-run >/tmp/koban-"$resource"-action-dry-run.json
+  run_json "$resource" upload dry_id --file "$upload_dry_file" --dry-run >/tmp/koban-"$resource"-upload-dry-run.json
+  echo "$resource dry_run_suite=$(jq -r .dry_run /tmp/koban-"$resource"-create-dry-run.json)/$(jq -r .dry_run /tmp/koban-"$resource"-update-dry-run.json)/$(jq -r .dry_run /tmp/koban-"$resource"-delete-dry-run.json)"
+done
+run_json search run --field query=KobanSmoke --dry-run >/tmp/koban-search-dry-run.json
+echo "search_dry_run=$(jq -r .dry_run /tmp/koban-search-dry-run.json)"
+run_json utility run --dry-run >/tmp/koban-utility-dry-run.json
+echo "utility_dry_run=$(jq -r .dry_run /tmp/koban-utility-dry-run.json) method=$(jq -r .method /tmp/koban-utility-dry-run.json)"
 
 invoice_id=$(
   run_json invoices create \
