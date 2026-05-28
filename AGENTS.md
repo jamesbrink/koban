@@ -13,8 +13,14 @@ surface read-only unless explicitly requested for write support:
 - Use only `GET` requests in CLI commands.
 - Invoice download commands may write PDF bytes to explicit local file paths,
   but they must still use read-only `GET` endpoints.
+- Prefer the public Invoice Ninja demo endpoint for read-only live smoke tests:
+  `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
+  `INVOICE_NINJA_API_TOKEN=TOKEN`.
 - Do not smoke test destructive, write, bulk, upload, import, email, purge,
-  refund, merge, archive, or delete endpoints against an active account.
+  refund, merge, archive, or delete endpoints against any environment unless
+  write support has been explicitly implemented and reviewed.
+- Use production or personal accounts only for intentional, non-destructive read
+  checks.
 - Keep token handling environment-first with `INVOICE_NINJA_API_TOKEN` and
   optional `INVOICE_NINJA_BASE_URL`.
 - Redact tokens in errors, traces, fixtures, and docs.

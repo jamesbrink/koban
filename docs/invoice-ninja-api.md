@@ -1,9 +1,10 @@
 # Invoice Ninja API Reference For Koban
 
 This document is Koban's working API reference. It is intentionally conservative
-because early development may run against an active Invoice Ninja account. Until
-we have explicit write safeguards, Koban should only perform read-only requests
-against production data.
+because early development touches accounting APIs. Koban's current implemented
+surface should only perform read-only requests. Prefer the public demo API for
+live smoke tests, and use production or personal accounts only for intentional,
+non-destructive reads.
 
 Last researched: 2026-05-28.
 
@@ -33,6 +34,7 @@ Last researched: 2026-05-28.
 - Invoice Ninja v5 uses the `/api/v1` namespace.
 - Hosted production base URL: `https://invoicing.co`.
 - Hosted demo base URL: `https://demo.invoiceninja.com`.
+- Hosted demo API token: `TOKEN`.
 - Self-hosted installs use the same `/api/v1` namespace under their own base URL.
 - The official API reference currently reports version `5.12.55`.
 - The docs say API requests must use HTTPS.
@@ -64,6 +66,9 @@ Notes:
 - `X-API-SECRET` is optional and only assessed on `/api/v1/login`.
 - Koban should load the token from `INVOICE_NINJA_API_TOKEN`.
 - Koban should default `INVOICE_NINJA_BASE_URL` to `https://invoicing.co`.
+- Local read-only smoke testing should prefer
+  `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
+  `INVOICE_NINJA_API_TOKEN=TOKEN`.
 - Never log request headers verbatim. Redact tokens and secrets in errors,
   traces, debug output, and agent-facing JSON.
 
@@ -189,9 +194,9 @@ The search endpoint is useful, but it is a `POST`:
 POST /api/v1/search
 ```
 
-Treat search as read-like but not part of the first production-account smoke
-test. Add it once Koban has a request body model, a `--dry-run` convention, and
-fixtures around token redaction.
+Treat search as read-like but not part of the first live smoke test because it
+uses `POST`. Add it once Koban has a request body model, a `--dry-run`
+convention, and fixtures around token redaction.
 
 ## Write And Destructive Endpoints To Avoid Initially
 
@@ -250,8 +255,8 @@ The current implementation is a read-only API foundation:
 1. A small HTTP client module with `base_url`, `api_token`, and default headers.
 2. Config loading from environment only:
    `INVOICE_NINJA_API_TOKEN` and optional `INVOICE_NINJA_BASE_URL`.
-3. `koban statics` uses `GET /api/v1/statics` as the least
-   business-data-heavy authenticated smoke test.
+3. `koban statics` uses `GET /api/v1/statics` as the smallest authenticated
+   smoke test, preferably against the public demo endpoint.
 4. Resource `list/show/template/edit-template` commands for clients, invoices,
    payments, quotes, credits, vendors, expenses, projects, and tasks.
 5. List pagination with `--page`, `--per-page`, `--all`, and `--limit`.
@@ -264,6 +269,10 @@ Safety rules for this milestone:
 - No automatic pagination across multiple pages unless `--all` is explicit.
 - No file uploads, no imports, no email endpoints, no bulk endpoints.
 - No command may mutate production data.
+- Live smoke tests should use the public demo endpoint by default:
+  `https://demo.invoiceninja.com` with token `TOKEN`.
+- Production or personal accounts are acceptable only for intentional,
+  non-destructive read checks.
 - JSON output should be stable enough for AI agents.
 - Human table output should hide noisy raw fields by default.
 - Error output must redact `INVOICE_NINJA_API_TOKEN`.
@@ -298,9 +307,9 @@ koban tasks list --all --limit 50
 
 ## Open Questions
 
-- Which hosted base URL does the active account use: `https://invoicing.co`,
-  `https://app.invoicing.co`, or a self-hosted domain? The API docs identify
-  `https://invoicing.co` as the v5 production API endpoint.
+- Should Koban add a first-class `--demo` flag or `koban smoke` command that
+  temporarily uses `https://demo.invoiceninja.com` with token `TOKEN` without
+  writing those values to a user's shell environment?
 - Should Koban prefer Invoice Ninja's response shape verbatim for agent JSON, or
   normalize list/show responses behind Koban's own `data`, `meta`, and `links`
   envelope?

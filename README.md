@@ -68,18 +68,38 @@ koban payments show <id>
 koban payments template --output json
 koban payments edit-template <id> --output json
 koban quotes list
+koban quotes show <id>
+koban quotes template --output json
+koban quotes edit-template <id> --output json
 koban credits list
+koban credits show <id>
+koban credits template --output json
+koban credits edit-template <id> --output json
 koban vendors list
+koban vendors show <id>
+koban vendors template --output json
+koban vendors edit-template <id> --output json
 koban expenses list
+koban expenses show <id>
+koban expenses template --output json
+koban expenses edit-template <id> --output json
 koban projects list
+koban projects show <id>
+koban projects template --output json
+koban projects edit-template <id> --output json
 koban tasks list
+koban tasks show <id>
+koban tasks template --output json
+koban tasks edit-template <id> --output json
 ```
 
 ## Invoice Ninja Direction
 
 Invoice Ninja v5 exposes an API under `/api/v1`. Hosted production is
 `https://invoicing.co`, and self-hosted installs use the same namespace under
-their own base URL.
+their own base URL. Invoice Ninja also provides a public demo API at
+`https://demo.invoiceninja.com` with the demo token `TOKEN`; use that target for
+read-only live smoke tests whenever possible.
 
 Authentication is token based. Requests require `X-API-TOKEN`, and the developer
 guide also documents `X-Requested-With: XMLHttpRequest` as a required security
@@ -103,11 +123,28 @@ koban payments template
 koban payments edit-template <id>
 koban quotes list
 koban quotes show <id>
+koban quotes template
+koban quotes edit-template <id>
 koban credits list
+koban credits show <id>
+koban credits template
+koban credits edit-template <id>
 koban vendors list
+koban vendors show <id>
+koban vendors template
+koban vendors edit-template <id>
 koban expenses list
+koban expenses show <id>
+koban expenses template
+koban expenses edit-template <id>
 koban projects list
+koban projects show <id>
+koban projects template
+koban projects edit-template <id>
 koban tasks list
+koban tasks show <id>
+koban tasks template
+koban tasks edit-template <id>
 ```
 
 The `template` and `edit-template` commands use Invoice Ninja's read-only
@@ -140,11 +177,21 @@ export INVOICE_NINJA_API_TOKEN="..."
 Tokens must never be printed by default, and human-facing output should have a
 matching JSON mode before it ships.
 
+For demo-only read smoke tests:
+
+```sh
+export INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
+export INVOICE_NINJA_API_TOKEN="TOKEN"
+```
+
 ## Safety
 
-Current commands issue only `GET` requests. Do not smoke test write, bulk,
-upload, import, email, purge, refund, merge, archive, or delete endpoints against
-an active account.
+Current commands issue only `GET` requests. Read-only live smoke tests should use
+the public demo endpoint above by default. Do not smoke test write, bulk, upload,
+import, email, purge, refund, merge, archive, or delete endpoints against any
+environment unless write support has been explicitly implemented and reviewed.
+Production or personal accounts should only be used for intentional,
+non-destructive reads.
 
 ## Development
 
@@ -187,7 +234,13 @@ smoke-statics   safe live GET /api/v1/statics smoke test
 
 The devshell also loads `INVOICE_NINJA_API_TOKEN` and
 `INVOICE_NINJA_BASE_URL` from a local gitignored `.env` file when those
-variables are not already set in the shell.
+variables are not already set in the shell. For routine live smoke testing, use
+the demo values:
+
+```dotenv
+INVOICE_NINJA_API_TOKEN=TOKEN
+INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com
+```
 
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
 `apps.koban`, `checks.koban`, and a development shell for Linux and Darwin on
