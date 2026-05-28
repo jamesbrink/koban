@@ -1,8 +1,9 @@
 //! Self-update support for release tarballs.
 //!
-//! Koban avoids the GitHub API here. The latest version is resolved by
-//! following the `/releases/latest` redirect, which also avoids unauthenticated
-//! API rate limits.
+//! Koban avoids the GitHub API here for stable updates. The latest version is
+//! resolved by following the `/releases/latest` redirect, which also avoids
+//! unauthenticated API rate limits. Nightlies are fetched from the rolling
+//! `nightly` prerelease.
 
 use std::{
     io::Read as _,
@@ -15,6 +16,7 @@ use sha2::{Digest, Sha256};
 use crate::{KobanError, Result};
 
 const GITHUB_REPO: &str = "jamesbrink/koban";
+const NIGHTLY_TAG: &str = "nightly";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InstallKind {
@@ -35,8 +37,8 @@ impl InstallKind {
     }
 }
 
-pub fn run(check: bool, force: bool, version: Option<String>) -> Result<String> {
-    run_with_ops(&SystemOps, check, force, version)
+pub fn run(check: bool, force: bool, version: Option<String>, nightly: bool) -> Result<String> {
+    run_with_ops(&SystemOps, check, force, version, nightly)
 }
 
 trait UpdateOps {
@@ -80,13 +82,18 @@ fn run_with_ops(
     check: bool,
     force: bool,
     version: Option<String>,
+    nightly: bool,
 ) -> Result<String> {
     let current = env!("CARGO_PKG_VERSION");
-    let target_tag = match version {
-        Some(version) => normalize_tag(&version),
-        None => {
-            ops.ensure_curl()?;
-            ops.fetch_latest_tag()?
+    let target_tag = if nightly {
+        NIGHTLY_TAG.to_string()
+    } else {
+        match version {
+            Some(version) => normalize_tag(&version),
+            None => {
+                ops.ensure_curl()?;
+                ops.fetch_latest_tag()?
+            }
         }
     };
     validate_tag(&target_tag)?;
@@ -94,13 +101,15 @@ fn run_with_ops(
 
     let mut lines = vec![format!("Current version: {current}")];
 
-    if !force && remote == current && !check {
+    if !nightly && !force && remote == current && !check {
         lines.push(format!("Already up to date ({current})"));
         return Ok(lines.join("\n"));
     }
 
     if check {
-        if is_newer(current, remote) {
+        if nightly {
+            lines.push("Nightly build available from the nightly release.".to_string());
+        } else if is_newer(current, remote) {
             lines.push(format!(
                 "New version available: {remote} (current: {current})"
             ));
@@ -114,7 +123,7 @@ fn run_with_ops(
         return Ok(lines.join("\n"));
     }
 
-    if !force && !is_newer(current, remote) {
+    if !nightly && !force && !is_newer(current, remote) {
         return Err(KobanError::Update {
             message: format!("refusing to downgrade from {current} to {remote} without --force"),
         });
@@ -134,7 +143,9 @@ fn run_with_ops(
 
     ensure_writable_install_dir(&exe_path)?;
 
-    let action = if is_newer(current, remote) {
+    let action = if nightly {
+        "Installing nightly"
+    } else if is_newer(current, remote) {
         "Updating"
     } else if remote == current {
         "Reinstalling"
@@ -187,7 +198,7 @@ fn is_newer(current: &str, remote: &str) -> bool {
 }
 
 fn normalize_tag(version: &str) -> String {
-    if version.starts_with('v') {
+    if version == NIGHTLY_TAG || version.starts_with('v') {
         version.to_string()
     } else {
         format!("v{version}")
@@ -195,11 +206,11 @@ fn normalize_tag(version: &str) -> String {
 }
 
 fn validate_tag(tag: &str) -> Result<()> {
-    if tag.starts_with('v') && parse_version(tag).is_some() {
+    if tag == NIGHTLY_TAG || (tag.starts_with('v') && parse_version(tag).is_some()) {
         Ok(())
     } else {
         Err(KobanError::Update {
-            message: format!("invalid release tag `{tag}`; expected a tag like v0.1.0"),
+            message: format!("invalid release tag `{tag}`; expected a tag like v0.1.0 or nightly"),
         })
     }
 }
@@ -453,25 +464,29 @@ mod tests {
         assert_eq!(parse_version("v1.2"), None);
         assert!(validate_tag("v1.2.3").is_ok());
         assert!(validate_tag("1.2.3").is_err());
+        assert_eq!(normalize_tag("nightly"), "nightly");
+        assert!(validate_tag("nightly").is_ok());
     }
 
     #[test]
     fn explicit_check_tag_does_not_require_network_or_curl() {
         let current = env!("CARGO_PKG_VERSION");
-        let output = run(true, false, Some(format!("v{current}"))).expect("check");
+        let output = run(true, false, Some(format!("v{current}")), false).expect("check");
         assert!(output.contains(&format!("Current version: {current}")));
         assert!(output.contains("Up to date"), "got: {output}");
     }
 
     #[test]
     fn explicit_invalid_tag_is_rejected() {
-        let error = run(true, false, Some("not-a-version".to_string())).expect_err("invalid tag");
+        let error =
+            run(true, false, Some("not-a-version".to_string()), false).expect_err("invalid tag");
         assert!(error.to_string().contains("invalid release tag"));
     }
 
     #[test]
     fn downgrade_requires_force_before_install_detection() {
-        let error = run(false, false, Some("v0.0.0".to_string())).expect_err("downgrade guard");
+        let error =
+            run(false, false, Some("v0.0.0".to_string()), false).expect_err("downgrade guard");
         assert!(error.to_string().contains("refusing to downgrade"));
     }
 
@@ -485,7 +500,7 @@ mod tests {
         );
 
         let output =
-            run_with_ops(&ops, false, false, Some(format!("v{current}"))).expect("current");
+            run_with_ops(&ops, false, false, Some(format!("v{current}")), false).expect("current");
 
         assert!(
             output.contains(&format!("Already up to date ({current})")),
@@ -499,7 +514,8 @@ mod tests {
     fn check_reports_older_explicit_versions_without_downgrading() {
         let ops = FakeOps::new("v0.0.0", PathBuf::from("/tmp/koban"), b"unused");
 
-        let output = run_with_ops(&ops, true, false, Some("v0.0.0".to_string())).expect("check");
+        let output =
+            run_with_ops(&ops, true, false, Some("v0.0.0".to_string()), false).expect("check");
 
         assert!(
             output.contains(&format!(
@@ -515,13 +531,28 @@ mod tests {
     fn latest_check_uses_redirect_without_downloading_assets() {
         let ops = FakeOps::new("v0.0.2", PathBuf::from("/tmp/koban"), b"unused");
 
-        let output = run_with_ops(&ops, true, false, None).expect("latest check");
+        let output = run_with_ops(&ops, true, false, None, false).expect("latest check");
 
         assert!(
             output.contains("New version available: 0.0.2"),
             "got: {output}"
         );
         assert_eq!(ops.curl_checks.get(), 1);
+        assert!(ops.fetches.borrow().is_empty());
+        assert!(ops.replaced.borrow().is_none());
+    }
+
+    #[test]
+    fn nightly_check_uses_rolling_release_without_latest_redirect() {
+        let ops = FakeOps::new("v9.9.9", PathBuf::from("/tmp/koban"), b"unused");
+
+        let output = run_with_ops(&ops, true, false, None, true).expect("nightly check");
+
+        assert!(
+            output.contains("Nightly build available from the nightly release"),
+            "got: {output}"
+        );
+        assert_eq!(ops.curl_checks.get(), 0);
         assert!(ops.fetches.borrow().is_empty());
         assert!(ops.replaced.borrow().is_none());
     }
@@ -538,7 +569,8 @@ mod tests {
         std::fs::create_dir_all(exe.parent().expect("parent")).expect("bin dir");
         let ops = FakeOps::new("v0.0.2", exe.clone(), &archive);
 
-        let output = run_with_ops(&ops, false, false, Some("v0.0.2".to_string())).expect("update");
+        let output =
+            run_with_ops(&ops, false, false, Some("v0.0.2".to_string()), false).expect("update");
 
         assert!(
             output.contains(&format!("Updating: {} -> 0.0.2", env!("CARGO_PKG_VERSION"))),
@@ -566,6 +598,36 @@ mod tests {
     }
 
     #[test]
+    fn managed_nightly_downloads_from_nightly_release() {
+        let expected_binary = b"nightly-koban";
+        let archive = make_tarball(&[("bin/koban", expected_binary)]);
+        let dir = tempfile::tempdir().expect("temp dir");
+        let exe = dir.path().join("koban");
+        std::fs::write(&exe, b"old").expect("old binary");
+        let ops = FakeOps::new("v9.9.9", exe, &archive);
+
+        let output = run_with_ops(&ops, false, false, None, true).expect("nightly update");
+
+        assert!(
+            output.contains(&format!(
+                "Installing nightly: {} -> nightly",
+                env!("CARGO_PKG_VERSION")
+            )),
+            "got: {output}"
+        );
+        assert_eq!(
+            ops.replaced.borrow().as_deref(),
+            Some(expected_binary.as_slice())
+        );
+        assert!(
+            ops.fetches
+                .borrow()
+                .iter()
+                .all(|url| url.contains("/releases/download/nightly/"))
+        );
+    }
+
+    #[test]
     fn package_managed_installs_return_upgrade_guidance() {
         let ops = FakeOps::new(
             "v0.0.2",
@@ -573,7 +635,7 @@ mod tests {
             b"unused",
         );
 
-        let error = run_with_ops(&ops, false, false, Some("v0.0.2".to_string()))
+        let error = run_with_ops(&ops, false, false, Some("v0.0.2".to_string()), false)
             .expect_err("managed install");
 
         assert!(error.to_string().contains("installed via Nix"), "{error}");

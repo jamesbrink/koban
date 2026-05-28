@@ -169,11 +169,17 @@ Releases are managed by release-please. When a release is cut, CI builds
 unsigned CLI tarballs for macOS and Linux, uploads `SHA256SUMS`, and publishes
 the crate to crates.io using `CARGO_REGISTRY_TOKEN`.
 
+The nightly workflow builds the current `main` branch into a rolling
+`nightly` prerelease. It uses a `nightly-staging` release while compiling so
+the previous nightly stays available to updater clients until the new assets
+are ready.
+
 The `install.sh` script is the supported `curl | sh` path for direct installs:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_VERSION=v0.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_VERSION=nightly sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_INSTALL_DIR=/usr/local/bin sh
 ```
 
@@ -183,8 +189,10 @@ recipe instead:
 
 ```sh
 koban update --check
+koban update --nightly --check
 koban update
 koban update --tag v0.1.0
+koban update --nightly
 ```
 
 ## API Notes

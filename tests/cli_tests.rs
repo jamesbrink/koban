@@ -62,6 +62,7 @@ fn update_help_mentions_supported_install_sources() {
         .stdout(predicate::str::contains("Nix"))
         .stdout(predicate::str::contains("cargo install"))
         .stdout(predicate::str::contains("Homebrew"))
+        .stdout(predicate::str::contains("--nightly"))
         .stdout(predicate::str::contains("api.github.com"));
 }
 

@@ -1,0 +1,219 @@
+name: Nightly Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - ".github/copilot-instructions.md"
+      - ".github/instructions/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release-please.yml"
+      - ".release-please-manifest.json"
+      - "CHANGELOG.md"
+  workflow_dispatch: {}
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compute-version:
+    name: Compute Version
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      last_tag: ${{ steps.version.outputs.last_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - id: version
+        run: |
+          set -euo pipefail
+          current=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "koban") | .version')
+          IFS='.' read -r major minor _ <<< "$current"
+          next_minor="${major}.$((minor + 1)).0"
+
+          last_tag=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          if [ -n "$last_tag" ]; then
+            commits=$(git rev-list --count "${last_tag}..HEAD")
+          else
+            commits=$(git rev-list --count HEAD)
+          fi
+
+          short=$(git rev-parse --short=7 HEAD)
+          version="${next_minor}-dev.${commits}.g${short}"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${short}" >> "$GITHUB_OUTPUT"
+          echo "last_tag=${last_tag}" >> "$GITHUB_OUTPUT"
+          echo "Computed nightly version: ${version}"
+
+  prepare-release:
+    name: Prepare Release
+    needs: compute-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset staging release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.compute-version.outputs.version }}
+          LAST_TAG: ${{ needs.compute-version.outputs.last_tag }}
+        run: |
+          set -euo pipefail
+          gh release delete nightly-staging --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+          notes="Automated nightly build of \`${GITHUB_SHA}\`.
+
+          **Version:** \`${VERSION}\`
+          **Built:** $(date -u +%FT%TZ)"
+
+          if [ -n "$LAST_TAG" ]; then
+            diff_url="https://github.com/${GITHUB_REPOSITORY}/compare/${LAST_TAG}...${GITHUB_SHA}"
+            notes="${notes}
+          [Changes since ${LAST_TAG}](${diff_url})"
+          fi
+
+          notes="${notes}
+
+          These builds are unstable pre-releases."
+
+          gh release create nightly-staging \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Nightly ${VERSION}" \
+            --notes "$notes" \
+            --prerelease \
+            --draft
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [compute-version, prepare-release]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            asset: koban-aarch64-apple-darwin.tar.gz
+          - os: macos-14
+            target: x86_64-apple-darwin
+            asset: koban-x86_64-apple-darwin.tar.gz
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            asset: koban-x86_64-unknown-linux-gnu.tar.gz
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            asset: koban-aarch64-unknown-linux-gnu.tar.gz
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: nightly-${{ matrix.target }}
+          cache-on-failure: true
+
+      - name: Stamp nightly version
+        env:
+          NIGHTLY_VERSION: ${{ needs.compute-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          perl -0pi -e 's/^version = "[^"]+"/version = "$ENV{NIGHTLY_VERSION}"/m' Cargo.toml
+          cargo update -p koban --precise "$NIGHTLY_VERSION"
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} --locked
+
+      - name: Strip binary
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            strip target/${{ matrix.target }}/release/koban
+          else
+            strip --strip-all target/${{ matrix.target }}/release/koban
+          fi
+
+      - name: Package
+        run: tar -czf ${{ matrix.asset }} -C target/${{ matrix.target }}/release koban
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.asset }}
+
+  publish:
+    name: Publish Nightly
+    needs: [compute-version, build]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Promote staging to nightly
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.compute-version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if ! gh release view nightly-staging --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::nightly-staging release is not reachable; aborting promotion"
+            exit 1
+          fi
+
+          cd artifacts
+          sha256sum *.tar.gz > SHA256SUMS
+          cd ..
+
+          gh release upload nightly-staging artifacts/*.tar.gz artifacts/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+          gh release delete nightly --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          gh release edit nightly-staging --repo "$GITHUB_REPOSITORY" --tag nightly --prerelease
+
+          for attempt in 1 2 3; do
+            gh release edit nightly --repo "$GITHUB_REPOSITORY" --draft=false || true
+            draft_state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/nightly" --jq '.draft' 2>/dev/null || echo "unknown")
+            if [ "$draft_state" = "false" ]; then
+              echo "nightly release is now draft=false"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::nightly release is still draft=$draft_state after 3 attempts"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          asset_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/nightly/SHA256SUMS"
+          for attempt in 1 2 3 4 5; do
+            http=$(curl -sIL -o /dev/null -w "%{http_code}" "$asset_url" || echo "000")
+            if [ "$http" = "200" ]; then
+              echo "Nightly SHA256SUMS reachable at $asset_url"
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::SHA256SUMS at $asset_url returned HTTP $http after promotion"
+              exit 1
+            fi
+            sleep 10
+          done
+
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/nightly-staging" 2>/dev/null || true

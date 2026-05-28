@@ -121,7 +121,8 @@ sources the command prints the right upgrade recipe and exits:
   Homebrew:  brew upgrade koban
 
 The latest tag is resolved by following the /releases/latest redirect, so this
-command does not hit api.github.com and avoids anonymous API rate limits.")]
+command does not hit api.github.com and avoids anonymous API rate limits. Use
+--nightly to install the rolling nightly build produced from main.")]
     Update {
         /// Report whether an update is available without writing to disk
         #[arg(long)]
@@ -134,6 +135,10 @@ command does not hit api.github.com and avoids anonymous API rate limits.")]
         /// Install a specific release tag instead of the latest release
         #[arg(long, value_name = "TAG")]
         tag: Option<String>,
+
+        /// Install the rolling nightly build from the nightly GitHub release
+        #[arg(long, conflicts_with = "tag")]
+        nightly: bool,
     },
 
     /// Generate shell completions
@@ -412,7 +417,12 @@ pub async fn execute(cli: Cli) -> Result<String> {
     let command = cli.command;
 
     match command {
-        Some(Commands::Update { check, force, tag }) => update::run(check, force, tag),
+        Some(Commands::Update {
+            check,
+            force,
+            tag,
+            nightly,
+        }) => update::run(check, force, tag, nightly),
         command => {
             let config = Config::from_env()?;
             execute_with_config(Cli { output, command }, config).await
@@ -438,7 +448,12 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Payments(command)) => {
             execute_resource(&client, output, Resource::Payments, command).await
         }
-        Some(Commands::Update { check, force, tag }) => update::run(check, force, tag),
+        Some(Commands::Update {
+            check,
+            force,
+            tag,
+            nightly,
+        }) => update::run(check, force, tag, nightly),
         Some(Commands::Completions { .. }) | None => Ok(String::new()),
     }
 }
@@ -1224,11 +1239,40 @@ mod tests {
                 output: OutputFormat::Table,
                 command: None,
             },
-            config,
+            config.clone(),
         )
         .await
         .expect("execute none");
         assert!(output.is_empty());
+
+        let output = execute(Cli {
+            output: OutputFormat::Table,
+            command: Some(Commands::Update {
+                check: true,
+                force: false,
+                tag: None,
+                nightly: true,
+            }),
+        })
+        .await
+        .expect("execute nightly check");
+        assert!(output.contains("Nightly build available"), "got: {output}");
+
+        let output = execute_with_config(
+            Cli {
+                output: OutputFormat::Table,
+                command: Some(Commands::Update {
+                    check: true,
+                    force: false,
+                    tag: None,
+                    nightly: true,
+                }),
+            },
+            config,
+        )
+        .await
+        .expect("execute nightly check with config");
+        assert!(output.contains("Nightly build available"), "got: {output}");
     }
 
     #[tokio::test]
