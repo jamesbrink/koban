@@ -315,6 +315,12 @@
                   echo "Created, updated, and deleted demo invoice $invoice_id"
                 '';
               }
+              {
+                category = "run";
+                name = "smoke-all-demo";
+                help = "explicit demo-only smoke test for every implemented command family";
+                command = "./scripts/smoke-all-demo.sh \"$@\"";
+              }
             ];
           };
 

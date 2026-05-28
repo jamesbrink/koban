@@ -897,10 +897,10 @@ fn invoice_action_uses_custom_action_route_when_confirmed() {
 }
 
 #[test]
-fn invoice_upload_posts_multipart_when_confirmed() {
+fn invoice_upload_puts_multipart_when_confirmed() {
     let server = MockServer::start();
     let mock = server.mock(|when, then| {
-        when.method(POST)
+        when.method(PUT)
             .path("/api/v1/invoices/invoice_1/upload")
             .query_param("include", "documents")
             .header("X-API-TOKEN", "test-token");

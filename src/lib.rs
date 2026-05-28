@@ -885,7 +885,7 @@ impl ApiClient {
         self.json_response(response, endpoint).await
     }
 
-    pub async fn post_multipart(
+    pub async fn put_multipart(
         &self,
         path: &str,
         query: &[(String, String)],
@@ -909,7 +909,7 @@ impl ApiClient {
 
         let response = self
             .http
-            .post(url)
+            .put(url)
             .header("X-API-TOKEN", &self.config.api_token)
             .header("X-Requested-With", REQUESTED_WITH)
             .multipart(form)
@@ -1269,10 +1269,10 @@ async fn execute_invoice_upload(
     let path = format!("api/v1/invoices/{}/upload", args.id);
 
     if args.safety.dry_run {
-        return render_dry_run("POST", &path, &query, None, Some(&args.files));
+        return render_dry_run("PUT", &path, &query, None, Some(&args.files));
     }
 
-    let json = client.post_multipart(&path, &query, &args.files).await?;
+    let json = client.put_multipart(&path, &query, &args.files).await?;
     render_value(output, Some(Resource::Invoices), &json)
 }
 

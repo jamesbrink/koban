@@ -56,7 +56,8 @@ sh -n install.sh
 Inside `nix develop`, helper commands include `fmt-check`, `clippy`,
 `run-tests`, `ci-local`, `coverage`, `koban`, `koban-help`, and
 `smoke-statics`. `smoke-invoice-write-demo` is demo-only and requires
-`KOBAN_LIVE_WRITE_SMOKE=1`.
+`KOBAN_LIVE_WRITE_SMOKE=1`; `smoke-all-demo` runs the broader demo-only command
+smoke suite with the same guard.
 
 ## Releases
 

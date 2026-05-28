@@ -207,7 +207,7 @@ POST /api/v1/invoices
 PUT /api/v1/invoices/{id}
 DELETE /api/v1/invoices/{id}
 POST /api/v1/invoices/bulk
-POST /api/v1/invoices/{id}/upload
+PUT /api/v1/invoices/{id}/upload
 GET /api/v1/invoices/{id}/{action}
 ```
 
@@ -230,6 +230,10 @@ retry_e_send=true
 
 Koban intentionally does not expose the documented `redirect` trigger.
 
+Note: the interactive docs label invoice document upload as `POST`, but the
+public demo API currently accepts `PUT /api/v1/invoices/{id}/upload`; Koban uses
+the live-compatible method.
+
 Safety rules:
 
 - Every invoice write supports `--dry-run`.
@@ -239,6 +243,9 @@ Safety rules:
   an amount paid, cancel, or retry e-send.
 - Mocked tests are required for every write path. Live write smoke tests must be
   explicitly opted in and should use the public demo endpoint.
+- `smoke-all-demo` is the repeatable full live smoke helper for the implemented
+  command families. It only runs when `KOBAN_LIVE_WRITE_SMOKE=1` and the
+  environment is set to the public demo URL with token `TOKEN`.
 
 ## Write And Destructive Endpoints To Avoid For Now
 

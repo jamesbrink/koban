@@ -30,7 +30,7 @@ The Nix devshell intentionally exposes the project helper menu. Keep these
 helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `build-release`, `check`, `clippy`, `fmt`, `fmt-check`, `run-tests`, `ci-local`,
 `coverage`, `koban`, `koban-help`, `smoke-statics`, and
-`smoke-invoice-write-demo`.
+`smoke-invoice-write-demo`, and `smoke-all-demo`.
 The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
 the gitignored `.env` file when those variables are not already set.
 

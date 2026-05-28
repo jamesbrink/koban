@@ -262,6 +262,7 @@ koban           cargo run -- ...
 koban-help      show koban help
 smoke-statics   safe live GET /api/v1/statics smoke test
 smoke-invoice-write-demo  explicit demo-only invoice create/update/delete smoke test
+smoke-all-demo  explicit demo-only smoke test for every implemented command family
 ```
 
 The devshell also loads `INVOICE_NINJA_API_TOKEN` and
@@ -278,6 +279,7 @@ The demo invoice write smoke helper is intentionally opt-in:
 
 ```sh
 KOBAN_LIVE_WRITE_SMOKE=1 smoke-invoice-write-demo
+KOBAN_LIVE_WRITE_SMOKE=1 smoke-all-demo
 ```
 
 The flake exports `packages.default`, `packages.koban`, `apps.default`,
