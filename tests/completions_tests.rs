@@ -1,45 +1,94 @@
-use std::process::Command;
+use assert_cmd::Command;
+use predicates::prelude::*;
 
-const BIN: &str = env!("CARGO_BIN_EXE_koban");
-
-fn stdout(output: &std::process::Output) -> String {
-    String::from_utf8_lossy(&output.stdout).into_owned()
+fn koban() -> Command {
+    Command::cargo_bin("koban").expect("koban binary")
 }
 
 #[test]
 fn completions_bash_outputs_script() {
-    let output = Command::new(BIN)
+    koban()
         .args(["completions", "bash"])
-        .output()
-        .expect("run koban completions bash");
-    assert!(output.status.success(), "command failed: {output:?}");
-
-    let stdout = stdout(&output);
-    assert!(stdout.contains("complete"), "got: {stdout}");
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("complete"))
+        .stdout(predicate::str::contains("clients"));
 }
 
 #[test]
 fn completions_zsh_outputs_script() {
-    let output = Command::new(BIN)
+    koban()
         .args(["completions", "zsh"])
-        .output()
-        .expect("run koban completions zsh");
-    assert!(output.status.success(), "command failed: {output:?}");
-
-    let stdout = stdout(&output);
-    assert!(stdout.contains("#compdef koban"), "got: {stdout}");
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#compdef koban"))
+        .stdout(predicate::str::contains("invoices"));
 }
 
 #[test]
-fn dynamic_root_completions_include_completions() {
-    let output = Command::new(BIN)
+fn completions_fish_outputs_script() {
+    koban()
+        .args(["completions", "fish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("complete"))
+        .stdout(predicate::str::contains("payments"));
+}
+
+#[test]
+fn completions_powershell_outputs_script() {
+    koban()
+        .args(["completions", "powershell"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Register-ArgumentCompleter"))
+        .stdout(predicate::str::contains("statics"));
+}
+
+#[test]
+fn completions_elvish_outputs_script() {
+    koban()
+        .args(["completions", "elvish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "edit:completion:arg-completer[koban]",
+        ))
+        .stdout(predicate::str::contains("clients"));
+}
+
+#[test]
+fn completions_nushell_outputs_script() {
+    koban()
+        .args(["completions", "nushell"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("export extern koban"))
+        .stdout(predicate::str::contains("completions"));
+}
+
+#[test]
+fn dynamic_root_completions_include_resources() {
+    koban()
         .env("COMPLETE", "bash")
         .env("_CLAP_COMPLETE_INDEX", "1")
         .args(["--", "koban", ""])
-        .output()
-        .expect("run dynamic completion");
-    assert!(output.status.success(), "completion failed: {output:?}");
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("clients"))
+        .stdout(predicate::str::contains("invoices"))
+        .stdout(predicate::str::contains("payments"))
+        .stdout(predicate::str::contains("completions"));
+}
 
-    let stdout = stdout(&output);
-    assert!(stdout.contains("completions"), "got: {stdout}");
+#[test]
+fn dynamic_resource_completions_include_list_and_show() {
+    koban()
+        .env("COMPLETE", "bash")
+        .env("_CLAP_COMPLETE_INDEX", "2")
+        .args(["--", "koban", "clients", ""])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("show"));
 }

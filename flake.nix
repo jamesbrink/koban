@@ -69,6 +69,9 @@
             pname = cargoToml.package.name;
             version = cargoToml.package.version;
             strictDeps = true;
+            buildInputs = lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.libiconv
+            ];
             inherit meta;
           };
 
@@ -106,6 +109,7 @@
               pkgs.rust-analyzer
               pkgs.cargo-llvm-cov
               pkgs.git
+              pkgs.libiconv
               pkgs.jq
             ];
 
