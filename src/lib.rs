@@ -14,7 +14,13 @@ mod resource;
 mod update;
 mod util;
 
-pub use cli::{Cli, Commands, CompletionShell, OutputFormat};
+pub use api::ApiClient;
+pub use cli::{
+    BulkArgs, Cli, Commands, CompletionShell, ConfirmableIdArgs, DownloadArgs, InvoiceActionArgs,
+    InvoiceCommand, InvoicePayloadArgs, InvoiceTriggerArgs, InvoiceWriteArgs, ListArgs,
+    OutputFormat, ResourceCommand, ShowArgs, TemplateArgs, UpdateInvoiceArgs, UploadArgs,
+    WriteSafetyArgs,
+};
 pub use commands::{execute, execute_with_config};
 pub use config::{API_TOKEN_ENV, BASE_URL_ENV, Config, DEFAULT_BASE_URL};
 pub use error::{KobanError, Result};
