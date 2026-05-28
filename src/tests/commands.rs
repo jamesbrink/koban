@@ -613,26 +613,29 @@ async fn utility_rejects_write_methods() {
 #[tokio::test]
 async fn endpoint_overrides_reject_write_methods() {
     let config = Config::from_values("http://localhost:1234", "token").expect("config");
-    let error = execute_with_config(
-        Cli {
-            output: OutputFormat::Json,
-            command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
-                endpoint: Some("clients/client_1/purge".to_string()),
-                method: Some(HttpMethod::Post),
-                payload: empty_resource_payload_args(),
-                safety: WriteSafetyArgs {
-                    dry_run: true,
-                    yes: false,
-                },
-                include: Vec::new(),
-            }))),
-        },
-        config,
-    )
-    .await
-    .expect_err("custom endpoint writes should be rejected");
-    assert!(matches!(error, KobanError::InvalidPayload { .. }));
-    assert!(error.to_string().contains("read-only"), "got: {error}");
+
+    for endpoint in ["clients/client_1/purge", "reports"] {
+        let error = execute_with_config(
+            Cli {
+                output: OutputFormat::Json,
+                command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
+                    endpoint: Some(endpoint.to_string()),
+                    method: Some(HttpMethod::Post),
+                    payload: empty_resource_payload_args(),
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                }))),
+            },
+            config.clone(),
+        )
+        .await
+        .expect_err("custom endpoint writes should be rejected");
+        assert!(matches!(error, KobanError::InvalidPayload { .. }));
+        assert!(error.to_string().contains("read-only"), "got: {error}");
+    }
 }
 
 #[tokio::test]

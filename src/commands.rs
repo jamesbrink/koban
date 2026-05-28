@@ -490,17 +490,18 @@ async fn execute_endpoint_run(
     default_endpoint: &str,
     args: EndpointArgs,
 ) -> Result<String> {
+    let custom_endpoint = args.endpoint.is_some();
     let endpoint = args
         .endpoint
         .unwrap_or_else(|| default_endpoint.to_string());
-    let custom_endpoint = endpoint != default_endpoint;
     validate_endpoint_path(&endpoint)?;
     let method = args
         .method
         .unwrap_or_else(|| default_method(default_endpoint));
     if (default_endpoint == "ping" || custom_endpoint) && !matches!(method, HttpMethod::Get) {
         return Err(KobanError::InvalidPayload {
-            message: "custom endpoint runners are read-only; use --method get".to_string(),
+            message: "custom and utility endpoint runners are read-only; use --method get"
+                .to_string(),
         });
     }
     let path = format!("api/v1/{endpoint}");
