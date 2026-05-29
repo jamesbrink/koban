@@ -38,14 +38,9 @@
   --vp-c-bg-soft: #f5f1e6;
   --vp-c-bg-elv: #ffffff;
 
-  /* Hero gradient — deep gold to bright gold to soft */
-  --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(
-    120deg,
-    #8a6d1f 0%,
-    #d4af37 55%,
-    #e8c766 100%
-  );
+  /* Hero name — solid gold (no gradient text). */
+  --vp-home-hero-name-color: #8a6d1f;
+  --vp-home-hero-name-background: transparent;
   --vp-home-hero-image-background-image:
     radial-gradient(
       circle at 30% 30%,
@@ -80,6 +75,9 @@
   --vp-c-brand-2: #d4af37;
   --vp-c-brand-3: #b8902a;
   --vp-c-brand-soft: rgba(232, 199, 102, 0.14);
+
+  /* Brighter solid gold on lacquer. */
+  --vp-home-hero-name-color: #d4af37;
 
   --vp-c-bg: var(--koban-char);
   --vp-c-bg-alt: var(--koban-ink);
