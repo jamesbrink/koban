@@ -17,8 +17,11 @@ clap_complete = { version = "4.6.0", features = ["unstable-dynamic"] }
 clap_complete_nushell = "4.6.0"
 directories = "6.0.0"
 flate2 = "1.1.5"
-# keyring backends are target-gated; crypto-rust avoids a system OpenSSL on Linux.
-keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+# Keyring backends are target-gated. Linux uses the kernel keyutils backend
+# (`linux-native`) rather than secret-service so the binary stays portable: no
+# libdbus/system C dependency, and a synchronous backend that won't block inside
+# koban's tokio runtime.
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "linux-native"] }
 miette = { version = "7.6.0", features = ["fancy"] }
 reqwest = { version = "0.12.24", default-features = false, features = ["json", "multipart", "rustls-tls-webpki-roots"] }
 rpassword = "7.5.3"
