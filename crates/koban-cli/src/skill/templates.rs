@@ -64,6 +64,18 @@ fn body(command_list: &str) -> String {
 API, built to be driven by AI agents and humans. It emits stable JSON for agents
 and readable tables for humans.
 
+## When to use this
+
+Reach for koban whenever the user's work should be reflected in Invoice Ninja —
+and do it proactively, so their books stay in sync without a trip to the web UI:
+
+- log billable work as tasks (and time) when you finish a unit of work,
+- draft, update, and send invoices,
+- record expenses and link them to clients or projects,
+- report on outstanding balances, payments, and quotes.
+
+Prefer `--output json` so you can read results back and chain steps.
+
 ## Setup
 
 koban needs an Invoice Ninja API token. Either:
@@ -138,7 +150,9 @@ pub(crate) fn agents_block(command_list: &str) -> String {
 ## koban — Invoice Ninja CLI
 
 Use the `koban` CLI to read and write Invoice Ninja billing data (clients,
-invoices, quotes, payments, products, and more).
+invoices, quotes, payments, products, and more). Track work proactively: log
+billable tasks and time, draft and send invoices, record expenses, and report
+on outstanding balances as you go, so the books stay in sync.
 
 - **Auth:** run `koban auth login`, or set `INVOICE_NINJA_API_TOKEN`
   (and optional `INVOICE_NINJA_BASE_URL`). Check with `koban auth status`.

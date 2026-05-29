@@ -162,3 +162,49 @@ fn generate_json_output_lists_written_paths() {
         .stdout(predicate::str::contains("\"mode\": \"generate\""))
         .stdout(predicate::str::contains("SKILL.md"));
 }
+
+#[test]
+fn generate_hints_how_to_install_the_files() {
+    let dir = tempdir().expect("tempdir");
+    koban()
+        .args(["skill", "generate", "--target", "claude-code", "--dir"])
+        .arg(dir.path())
+        .assert()
+        .success()
+        // Names the install command and the manual-copy escape hatch.
+        .stdout(predicate::str::contains("koban skill install"))
+        .stdout(predicate::str::contains("manually"));
+}
+
+#[test]
+fn generate_json_includes_the_install_hint() {
+    let dir = tempdir().expect("tempdir");
+    koban()
+        .args([
+            "--output",
+            "json",
+            "skill",
+            "generate",
+            "--target",
+            "claude-code",
+            "--dir",
+        ])
+        .arg(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"hint\""))
+        .stdout(predicate::str::contains("koban skill install"));
+}
+
+#[test]
+fn install_does_not_print_the_generate_hint() {
+    let dir = tempdir().expect("tempdir");
+    // The hint is for review output only; install writes to live locations and
+    // should not nudge the user to run install again.
+    koban()
+        .args(["skill", "install", "--target", "claude-code", "--dir"])
+        .arg(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("koban skill install").not());
+}

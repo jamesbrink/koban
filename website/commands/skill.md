@@ -4,6 +4,11 @@
 drive koban — its auth, JSON output, and `--dry-run`/`--yes` safety gates. One
 shared skill body is wrapped in the frontmatter each harness expects.
 
+Install it once and your agent can **track work in Invoice Ninja automatically**
+— logging billable tasks and time, drafting and sending invoices, recording
+expenses, and reporting on outstanding balances as it works, instead of you
+switching to the web UI.
+
 ## Generate vs install
 
 ```sh
@@ -15,8 +20,10 @@ koban skill install --force --target codex # overwrite existing files
 ```
 
 `generate` writes files into a directory (default `./koban-skills`) so you can
-inspect them first. `install` writes into the live harness locations — the
-current project by default, or your user-level config with `--global`.
+inspect them first, then prints a hint reminding you to activate them with
+`koban skill install` (or copy them into place manually). `install` writes into
+the live harness locations — the current project by default, or your user-level
+config with `--global`.
 
 ## Targets
 

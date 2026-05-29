@@ -1,6 +1,8 @@
 # Configuration
 
-koban's configuration model is environment-first.
+koban's configuration model is environment-first: environment variables always
+win, falling back to credentials you store with
+[`koban auth login`](/commands/auth).
 
 ## Environment variables
 
@@ -9,10 +11,16 @@ export INVOICE_NINJA_BASE_URL="https://invoicing.co"
 export INVOICE_NINJA_API_TOKEN="..."
 ```
 
-| Variable                  | Required | Default                | Notes                                           |
-| ------------------------- | -------- | ---------------------- | ----------------------------------------------- |
-| `INVOICE_NINJA_API_TOKEN` | yes      | —                      | Token-based auth, sent as `X-API-TOKEN`.        |
-| `INVOICE_NINJA_BASE_URL`  | no       | `https://invoicing.co` | Hosted production or your self-hosted base URL. |
+| Variable                  | Required | Default                | Notes                                              |
+| ------------------------- | -------- | ---------------------- | -------------------------------------------------- |
+| `INVOICE_NINJA_API_TOKEN` | no\*     | —                      | Token-based auth, sent as `X-API-TOKEN`.           |
+| `INVOICE_NINJA_BASE_URL`  | no       | `https://invoicing.co` | Hosted production or your self-hosted base URL.    |
+| `KOBAN_CONFIG_DIR`        | no       | platform config dir    | Overrides where `koban auth` stores `config.json`. |
+
+\* A token is required, but it may come from the environment variable, the OS
+keychain, or the stored config file. Resolution order is
+`INVOICE_NINJA_API_TOKEN` → keychain → config file, so env vars always win. See
+[Authentication](/commands/auth).
 
 Tokens are never printed by default — not in output, errors, traces, or logs.
 

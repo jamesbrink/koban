@@ -66,6 +66,29 @@ cargo install koban-cli
 nix run github:jamesbrink/koban -- --help
 ```
 
+## Use with AI agents
+
+koban is built to be driven by AI coding agents. One command teaches your agent
+the whole CLI:
+
+```sh
+koban skill install --target all          # Claude Code, Codex, and an AGENTS.md block
+koban skill install --target claude-code  # or pick a single harness
+koban skill generate                      # write to ./koban-skills to review first
+```
+
+Once the skill is installed, an agent can **track your work in Invoice Ninja
+automatically** — logging billable tasks and time, drafting and sending
+invoices, recording expenses, and reporting on outstanding balances — while it
+works, instead of you context-switching to the web UI. The skill teaches the
+agent koban's stable JSON output and its `--dry-run`/`--yes` safety gates, so
+every write is previewed before it happens.
+
+Supported harnesses include Claude Code, OpenAI Codex CLI, pi, Cursor, Claude
+Desktop, and any tool that reads `AGENTS.md` (Windsurf, Gemini CLI, Aider,
+Copilot, Zed, …). See the
+[agent skill docs](https://jamesbrink.online/koban/commands/skill).
+
 ## Current CLI
 
 ```sh
