@@ -63,19 +63,40 @@ done
 
 expanded_resources=(
   locations products recurring-invoices purchase-orders recurring-expenses
-  bank-transactions bank-integrations bank-transaction-rules expense-categories
-  tax-rates payment-terms task-statuses activities system-logs documents
+  recurring-quotes bank-transactions bank-integrations bank-transaction-rules
+  group-settings expense-categories tax-rates payment-terms task-schedulers
+  task-statuses activities system-logs documents
   designs templates users companies company-gateways company-ledger
-  company-users tokens webhooks imports subscriptions client-gateway-tokens
+  company-users tokens webhooks subscriptions client-gateway-tokens
 )
-expanded_write_resources=(
+create_resources=(
   locations products recurring-invoices purchase-orders recurring-expenses
-  bank-transactions bank-integrations bank-transaction-rules expense-categories
-  tax-rates payment-terms task-statuses documents designs templates users
-  companies company-gateways company-users tokens webhooks subscriptions
-  client-gateway-tokens
+  recurring-quotes bank-transactions bank-integrations bank-transaction-rules
+  group-settings expense-categories payment-terms task-schedulers task-statuses
+  designs templates users companies company-gateways company-users tokens
+  webhooks subscriptions client-gateway-tokens
 )
-demo_optional_404=(templates company-users imports)
+update_delete_resources=(
+  locations products recurring-invoices purchase-orders recurring-expenses
+  recurring-quotes bank-transactions bank-integrations bank-transaction-rules
+  group-settings expense-categories tax-rates payment-terms task-schedulers
+  task-statuses designs users companies company-gateways tokens webhooks
+  subscriptions client-gateway-tokens
+)
+bulk_resources=(
+  products recurring-invoices purchase-orders recurring-expenses recurring-quotes
+  bank-transactions bank-integrations bank-transaction-rules group-settings
+  expense-categories tax-rates payment-terms task-schedulers task-statuses
+  designs users company-gateways tokens webhooks subscriptions
+)
+upload_resources=(
+  clients companies credits expenses group-settings payments products projects
+  purchase-orders quotes recurring-expenses recurring-invoices tasks vendors
+)
+get_action_resources=(
+  payments quotes recurring-invoices recurring-quotes purchase-orders
+)
+demo_optional_404=(templates company-users)
 
 allows_demo_404() {
   local resource="$1"
@@ -154,17 +175,35 @@ run_json invoices upload dry_invoice --file "$upload_dry_file" --dry-run >/tmp/k
 echo "upload_dry_run=$(jq -r .dry_run /tmp/koban-upload-dry-run.json) method=$(jq -r .method /tmp/koban-upload-dry-run.json)"
 
 echo "== expanded api dry-run commands =="
-for resource in "${expanded_write_resources[@]}"; do
+for resource in "${create_resources[@]}"; do
   run_json "$resource" create --name KobanSmoke --dry-run >/tmp/koban-"$resource"-create-dry-run.json
+  echo "$resource create_dry_run=$(jq -r .dry_run /tmp/koban-"$resource"-create-dry-run.json)"
+done
+for resource in "${update_delete_resources[@]}"; do
   run_json "$resource" update dry_id --field notes=Updated --dry-run >/tmp/koban-"$resource"-update-dry-run.json
   run_json "$resource" delete dry_id --dry-run >/tmp/koban-"$resource"-delete-dry-run.json
-  run_json "$resource" bulk --action archive --id dry_id --dry-run >/tmp/koban-"$resource"-bulk-dry-run.json
-  run_json "$resource" action dry_id --action archive --dry-run >/tmp/koban-"$resource"-action-dry-run.json
-  run_json "$resource" upload dry_id --file "$upload_dry_file" --dry-run >/tmp/koban-"$resource"-upload-dry-run.json
-  echo "$resource dry_run_suite=$(jq -r .dry_run /tmp/koban-"$resource"-create-dry-run.json)/$(jq -r .dry_run /tmp/koban-"$resource"-update-dry-run.json)/$(jq -r .dry_run /tmp/koban-"$resource"-delete-dry-run.json)"
+  echo "$resource update_delete_dry_run=$(jq -r .dry_run /tmp/koban-"$resource"-update-dry-run.json)/$(jq -r .dry_run /tmp/koban-"$resource"-delete-dry-run.json)"
 done
+for resource in "${bulk_resources[@]}"; do
+  run_json "$resource" bulk --action archive --id dry_id --dry-run >/tmp/koban-"$resource"-bulk-dry-run.json
+  echo "$resource bulk_dry_run=$(jq -r .dry_run /tmp/koban-"$resource"-bulk-dry-run.json)"
+done
+for resource in "${upload_resources[@]}"; do
+  run_json "$resource" upload dry_id --file "$upload_dry_file" --dry-run >/tmp/koban-"$resource"-upload-dry-run.json
+  echo "$resource upload_dry_run=$(jq -r .dry_run /tmp/koban-"$resource"-upload-dry-run.json)"
+done
+for resource in "${get_action_resources[@]}"; do
+  run_json "$resource" action dry_id --action archive --dry-run >/tmp/koban-"$resource"-action-dry-run.json
+  echo "$resource action_dry_run=$(jq -r .dry_run /tmp/koban-"$resource"-action-dry-run.json)"
+done
+run_json clients action dry_id --action updateTaxData --field country_id=840 --dry-run >/tmp/koban-clients-action-dry-run.json
+echo "clients action_dry_run=$(jq -r .dry_run /tmp/koban-clients-action-dry-run.json)"
 run_json search run --field query=KobanSmoke --dry-run >/tmp/koban-search-dry-run.json
 echo "search_dry_run=$(jq -r .dry_run /tmp/koban-search-dry-run.json)"
+run_json reports run --endpoint reports/invoices --field date_range=last30 --dry-run >/tmp/koban-reports-dry-run.json
+echo "reports_dry_run=$(jq -r .dry_run /tmp/koban-reports-dry-run.json)"
+run_json charts run --endpoint charts/totals --field currency_id=1 --dry-run >/tmp/koban-charts-dry-run.json
+echo "charts_dry_run=$(jq -r .dry_run /tmp/koban-charts-dry-run.json)"
 run_json utility run --dry-run >/tmp/koban-utility-dry-run.json
 echo "utility_dry_run=$(jq -r .dry_run /tmp/koban-utility-dry-run.json) method=$(jq -r .method /tmp/koban-utility-dry-run.json)"
 

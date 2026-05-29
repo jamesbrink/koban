@@ -11,10 +11,13 @@ fn expanded_resource_labels_and_upload_methods_are_stable() {
     let labels = [
         (Resource::PurchaseOrders, "purchase orders"),
         (Resource::RecurringExpenses, "recurring expenses"),
+        (Resource::RecurringQuotes, "recurring quotes"),
         (Resource::BankTransactions, "bank transactions"),
         (Resource::BankIntegrations, "bank integrations"),
         (Resource::BankTransactionRules, "bank transaction rules"),
+        (Resource::GroupSettings, "group settings"),
         (Resource::PaymentTerms, "payment terms"),
+        (Resource::TaskSchedulers, "task schedulers"),
         (Resource::TaskStatuses, "task statuses"),
         (Resource::SystemLogs, "system logs"),
         (Resource::CompanyGateways, "company gateways"),

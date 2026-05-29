@@ -47,7 +47,8 @@ level:
 2. **Generic typed methods** — `client.resource::<T>(Resource::TaxRates)` works
    for any `T: DeserializeOwned`, including your own types or `serde_json::Value`.
 3. **Raw JSON escape hatch** — `client.get_json(...)`, `post_json`, `put_json`,
-   and `delete_json` return `serde_json::Value` for anything not yet modeled.
+   and `delete_json` return `serde_json::Value` for non-resource endpoints or
+   routes outside the generic CRUD shape.
 
 ## What gets re-exported
 

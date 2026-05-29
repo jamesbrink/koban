@@ -1,24 +1,29 @@
-use std::{fs, path::Path};
-
 use serde_json::{Value, json};
 
 use koban::{ApiClient, Config, KobanError, Resource, Result};
 
 use crate::{
     cli::{
-        BulkArgs, Cli, Commands, ConfirmableIdArgs, DownloadArgs, EndpointArgs, HttpMethod,
+        BulkArgs, Cli, Commands, ConfirmableIdArgs, DownloadArgs, HttpMethod,
         InspectResourceCommand, InvoiceActionArgs, InvoiceCommand, InvoiceWriteArgs, ListArgs,
         OutputFormat, ResourceActionArgs, ResourceCommand, ResourceWriteArgs, UpdateInvoiceArgs,
         UpdateResourceArgs, UploadArgs,
     },
+    endpoint_runner::execute_endpoint,
     invoice::{
         invoice_payload, push_invoice_triggers, render_dry_run, require_confirmation,
         validate_invoice_triggers, validate_path_segment,
     },
     payload::{merge_resource_action_payload, resource_payload},
     render::{render_value, response_rows},
+    resource_routes::{
+        ResourceCapability, require_resource_capability, resource_action_route,
+        resource_delete_path, resource_download_base_path, resource_update_path,
+    },
     update,
 };
+
+pub(crate) use crate::file_paths::{ensure_download_path, ensure_upload_file, write_download_file};
 
 const FETCH_ALL_PAGE_CAP: u32 = 100;
 
@@ -89,6 +94,9 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::RecurringExpenses(command)) => {
             execute_resource(&client, output, Resource::RecurringExpenses, command).await
         }
+        Some(Commands::RecurringQuotes(command)) => {
+            execute_resource(&client, output, Resource::RecurringQuotes, command).await
+        }
         Some(Commands::BankTransactions(command)) => {
             execute_resource(&client, output, Resource::BankTransactions, command).await
         }
@@ -98,6 +106,9 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::BankTransactionRules(command)) => {
             execute_resource(&client, output, Resource::BankTransactionRules, command).await
         }
+        Some(Commands::GroupSettings(command)) => {
+            execute_resource(&client, output, Resource::GroupSettings, command).await
+        }
         Some(Commands::ExpenseCategories(command)) => {
             execute_resource(&client, output, Resource::ExpenseCategories, command).await
         }
@@ -106,6 +117,9 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         }
         Some(Commands::PaymentTerms(command)) => {
             execute_resource(&client, output, Resource::PaymentTerms, command).await
+        }
+        Some(Commands::TaskSchedulers(command)) => {
+            execute_resource(&client, output, Resource::TaskSchedulers, command).await
         }
         Some(Commands::TaskStatuses(command)) => {
             execute_resource(&client, output, Resource::TaskStatuses, command).await
@@ -146,9 +160,6 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Webhooks(command)) => {
             execute_resource(&client, output, Resource::Webhooks, command).await
         }
-        Some(Commands::Imports(command)) => {
-            execute_inspect_resource(&client, output, Resource::Imports, command).await
-        }
         Some(Commands::Subscriptions(command)) => {
             execute_resource(&client, output, Resource::Subscriptions, command).await
         }
@@ -186,6 +197,7 @@ async fn execute_resource(
     match command {
         ResourceCommand::List(args) => execute_list(client, output, resource, args).await,
         ResourceCommand::Show(args) => {
+            require_resource_capability(resource, ResourceCapability::Show)?;
             validate_path_id(&format!("{} id", resource.label()), &args.id)?;
             let mut query = Vec::new();
             push_include(&mut query, args.include);
@@ -196,6 +208,7 @@ async fn execute_resource(
             render_value(output, Some(resource), &json)
         }
         ResourceCommand::Template(args) => {
+            require_resource_capability(resource, ResourceCapability::Template)?;
             let mut query = Vec::new();
             push_include(&mut query, args.include);
 
@@ -205,6 +218,7 @@ async fn execute_resource(
             render_value(output, Some(resource), &json)
         }
         ResourceCommand::EditTemplate(args) => {
+            require_resource_capability(resource, ResourceCapability::EditTemplate)?;
             validate_path_id(&format!("{} id", resource.label()), &args.id)?;
             let mut query = Vec::new();
             push_include(&mut query, args.include);
@@ -233,6 +247,7 @@ async fn execute_resource(
         ResourceCommand::Action(args) => {
             execute_resource_action(client, output, resource, args).await
         }
+        ResourceCommand::Download(args) => execute_resource_download(client, resource, args).await,
     }
 }
 
@@ -255,6 +270,7 @@ async fn execute_resource_create(
     resource: Resource,
     args: ResourceWriteArgs,
 ) -> Result<String> {
+    require_resource_capability(resource, ResourceCapability::Create)?;
     let body = resource_payload(args.payload, true)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
@@ -276,11 +292,12 @@ async fn execute_resource_update(
     resource: Resource,
     args: UpdateResourceArgs,
 ) -> Result<String> {
+    require_resource_capability(resource, ResourceCapability::Update)?;
     let body = resource_payload(args.payload, true)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     validate_path_id(&format!("{} id", resource.label()), &args.id)?;
-    let path = format!("api/v1/{}/{}", resource.path(), args.id);
+    let path = resource_update_path(resource, &args.id);
 
     require_confirmation(&format!("{} update", resource.label()), &args.safety)?;
 
@@ -298,11 +315,12 @@ async fn execute_resource_delete(
     resource: Resource,
     args: ConfirmableIdArgs,
 ) -> Result<String> {
+    require_resource_capability(resource, ResourceCapability::Delete)?;
     require_confirmation(&format!("{} delete", resource.label()), &args.safety)?;
     validate_path_id(&format!("{} id", resource.label()), &args.id)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-    let path = format!("api/v1/{}/{}", resource.path(), args.id);
+    let path = resource_delete_path(resource, &args.id);
 
     if args.safety.dry_run {
         return render_dry_run("DELETE", &path, &query, None, None);
@@ -318,6 +336,7 @@ async fn execute_resource_bulk(
     resource: Resource,
     args: BulkArgs,
 ) -> Result<String> {
+    require_resource_capability(resource, ResourceCapability::Bulk)?;
     require_confirmation(&format!("{} bulk action", resource.label()), &args.safety)?;
     validate_path_ids(&format!("{} id", resource.label()), &args.ids)?;
     let mut query = Vec::new();
@@ -339,6 +358,7 @@ async fn execute_resource_upload(
     resource: Resource,
     args: UploadArgs,
 ) -> Result<String> {
+    require_resource_capability(resource, ResourceCapability::Upload)?;
     require_confirmation(
         &format!("{} document upload", resource.label()),
         &args.safety,
@@ -379,19 +399,59 @@ async fn execute_resource_action(
     require_confirmation(&format!("{} action", resource.label()), &args.safety)?;
     validate_path_id(&format!("{} id", resource.label()), &args.id)?;
     validate_path_segment("resource action", &args.action)?;
-    let body = resource_payload(args.payload, false)?;
     let mut query = Vec::new();
     push_include(&mut query, args.include);
-    let path = format!("api/v1/{}/bulk", resource.path());
-    let mut bulk_body = bulk_action_body(args.action, vec![args.id], None);
-    merge_resource_action_payload(&mut bulk_body, body);
+    let route = resource_action_route(resource, &args.id, &args.action);
+    if route.is_bulk {
+        require_resource_capability(resource, ResourceCapability::Bulk)?;
+    }
+    let body = resource_payload(
+        args.payload,
+        matches!(route.method, HttpMethod::Post | HttpMethod::Put),
+    )?;
+    if route.method == HttpMethod::Get && body.as_object().is_some_and(|body| !body.is_empty()) {
+        return Err(KobanError::InvalidPayload {
+            message: "GET resource actions do not send request bodies".to_string(),
+        });
+    }
+    let bulk_body = if route.is_bulk {
+        let mut body_with_action = bulk_action_body(args.action, vec![args.id], None);
+        merge_resource_action_payload(&mut body_with_action, body);
+        body_with_action
+    } else {
+        body
+    };
 
     if args.safety.dry_run {
-        return render_dry_run("POST", &path, &query, Some(&bulk_body), None);
+        return render_dry_run(
+            route.method.label(),
+            &route.path,
+            &query,
+            route.body.then_some(&bulk_body),
+            None,
+        );
     }
 
-    let json = client.post_json(&path, &query, &bulk_body).await?;
+    let json = match route.method {
+        HttpMethod::Get => client.get_json(&route.path, &query).await?,
+        HttpMethod::Post => client.post_json(&route.path, &query, &bulk_body).await?,
+        HttpMethod::Put => client.put_json(&route.path, &query, &bulk_body).await?,
+        HttpMethod::Delete => client.delete_json(&route.path, &query).await?,
+    };
     render_value(output, Some(resource), &json)
+}
+
+async fn execute_resource_download(
+    client: &ApiClient,
+    resource: Resource,
+    args: DownloadArgs,
+) -> Result<String> {
+    let Some(base_path) = resource_download_base_path(resource) else {
+        return Err(KobanError::InvalidPayload {
+            message: format!("{} does not support PDF downloads", resource.label()),
+        });
+    };
+    execute_download(client, base_path, "download", args).await
 }
 
 async fn execute_invoice(
@@ -443,93 +503,13 @@ async fn execute_invoice(
     }
 }
 
-async fn execute_endpoint(
-    client: &ApiClient,
-    output: OutputFormat,
-    default_endpoint: &str,
-    command: crate::cli::EndpointCommand,
-) -> Result<String> {
-    match command {
-        crate::cli::EndpointCommand::Run(args) => {
-            execute_endpoint_run(client, output, default_endpoint, args).await
-        }
-    }
-}
-
-async fn execute_endpoint_run(
-    client: &ApiClient,
-    output: OutputFormat,
-    default_endpoint: &str,
-    args: EndpointArgs,
-) -> Result<String> {
-    let custom_endpoint = args.endpoint.is_some();
-    let endpoint = args
-        .endpoint
-        .unwrap_or_else(|| default_endpoint.to_string());
-    validate_endpoint_path(&endpoint)?;
-    let method = args
-        .method
-        .unwrap_or_else(|| default_method(default_endpoint));
-    if (default_endpoint == "ping" || custom_endpoint) && !matches!(method, HttpMethod::Get) {
-        return Err(KobanError::InvalidPayload {
-            message: "custom and utility endpoint runners are read-only; use --method get"
-                .to_string(),
-        });
-    }
-    let path = format!("api/v1/{endpoint}");
-    let body = resource_payload(
-        args.payload,
-        matches!(method, HttpMethod::Post | HttpMethod::Put),
-    )?;
-    let has_body = body.as_object().is_some_and(|body| !body.is_empty());
-    if has_body && matches!(method, HttpMethod::Get | HttpMethod::Delete) {
-        return Err(KobanError::InvalidPayload {
-            message: format!(
-                "{} endpoint commands do not send request bodies; use --method post or --method put for payload fields",
-                method.label()
-            ),
-        });
-    }
-    let mut query = Vec::new();
-    push_include(&mut query, args.include);
-    if args.safety.dry_run {
-        return render_dry_run(
-            method.label(),
-            &path,
-            &query,
-            has_body.then_some(&body),
-            None,
-        );
-    }
-
-    if !matches!(method, HttpMethod::Get) {
-        let action = format!("endpoint {}", method.label().to_ascii_lowercase());
-        require_confirmation(&action, &args.safety)?;
-    }
-
-    let json = match method {
-        HttpMethod::Get => client.get_json(&path, &query).await?,
-        HttpMethod::Post => client.post_json(&path, &query, &body).await?,
-        HttpMethod::Put => client.put_json(&path, &query, &body).await?,
-        HttpMethod::Delete => client.delete_json(&path, &query).await?,
-    };
-    render_value(output, None, &json)
-}
-
-fn default_method(default_endpoint: &str) -> HttpMethod {
-    if default_endpoint == "ping" {
-        HttpMethod::Get
-    } else {
-        HttpMethod::Post
-    }
-}
-
 async fn execute_list(
     client: &ApiClient,
     output: OutputFormat,
     resource: Resource,
     args: ListArgs,
 ) -> Result<String> {
+    require_resource_capability(resource, ResourceCapability::List)?;
     let mut base_query = Vec::new();
     push_include(&mut base_query, args.include);
     push_sort(&mut base_query, args.sort);
@@ -790,43 +770,6 @@ fn validate_path_ids(label: &str, ids: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn write_download_file(path: &Path, bytes: Vec<u8>, force: bool) -> Result<()> {
-    ensure_download_path(path, force)?;
-    fs::write(path, bytes).map_err(|source| KobanError::File {
-        message: source.to_string(),
-    })
-}
-
-pub(crate) fn ensure_download_path(path: &Path, force: bool) -> Result<()> {
-    if path.exists() && !force {
-        return Err(KobanError::File {
-            message: format!("{} already exists", path.display()),
-        });
-    }
-
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-        && !parent.exists()
-    {
-        return Err(KobanError::File {
-            message: format!("parent directory {} does not exist", parent.display()),
-        });
-    }
-
-    Ok(())
-}
-
-pub(crate) fn ensure_upload_file(path: &Path) -> Result<()> {
-    let metadata = fs::metadata(path).map_err(|source| KobanError::File {
-        message: format!("could not read {}: {source}", path.display()),
-    })?;
-    if !metadata.is_file() {
-        return Err(KobanError::File {
-            message: format!("{} is not a file", path.display()),
-        });
-    }
-    Ok(())
-}
 pub(crate) fn push_include(query: &mut Vec<(String, String)>, include: Vec<String>) {
     let include = include
         .into_iter()
@@ -875,21 +818,4 @@ pub(crate) fn apply_limit_to_response(mut value: Value, limit: Option<u32>) -> V
     }
 
     value
-}
-
-fn validate_endpoint_path(path: &str) -> Result<()> {
-    let is_safe = !path.is_empty()
-        && !path.starts_with('/')
-        && !path.contains("..")
-        && path
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'/'));
-
-    if is_safe {
-        Ok(())
-    } else {
-        Err(KobanError::InvalidPayload {
-            message: "endpoint must be a relative /api/v1 path".to_string(),
-        })
-    }
 }

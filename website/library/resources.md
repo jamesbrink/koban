@@ -6,8 +6,10 @@ handle scoped to one resource. The built-in accessors are:
 `clients()`, `invoices()`, `payments()`, `quotes()`, `credits()`, `products()`,
 `expenses()`, `vendors()`, `projects()`, and `tasks()`.
 
-For any other resource, use the generic `resource::<T>(Resource)` method with a
-[`Resource`](/reference/resource-families) variant.
+For any other modeled resource family, use the generic
+`resource::<T>(Resource)` method with a [`Resource`](/reference/resource-families)
+variant. The generic handle covers resource families even when Koban does not
+ship a built-in Rust struct for them.
 
 ## Methods on `Resources<T>`
 
@@ -77,8 +79,9 @@ let raw = client
 
 ## Raw JSON escape hatch
 
-When a route isn't covered by a typed method, drop down to the raw `ApiClient`
-methods, which return `serde_json::Value`:
+When a route is not represented by a `Resource` variant or does not follow the
+resource CRUD shape, drop down to the raw `ApiClient` methods, which return
+`serde_json::Value`:
 
 ```rust
 let value = client.get_json("/api/v1/statics", &[]).await?;

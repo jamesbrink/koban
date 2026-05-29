@@ -39,9 +39,9 @@ fn path_ids_reject_route_changing_segments_before_network() {
             "--dry-run",
         ],
         vec![
-            "documents",
+            "clients",
             "upload",
-            "document/one",
+            "client/one",
             "--file",
             upload.to_str().expect("upload path"),
             "--dry-run",

@@ -140,7 +140,7 @@ fn dynamic_inspect_resource_completions_omit_write_commands() {
     koban()
         .env("COMPLETE", "bash")
         .env("_CLAP_COMPLETE_INDEX", "2")
-        .args(["--", "koban", "imports", ""])
+        .args(["--", "koban", "company-ledger", ""])
         .assert()
         .success()
         .stdout(predicate::str::contains("list"))

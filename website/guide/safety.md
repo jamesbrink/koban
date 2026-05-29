@@ -24,9 +24,10 @@ footer/terms, or retrying e-send.
 
 ## Read-only by default for risky surfaces
 
-- **Inspect-only resources** — `activities`, `system-logs`, `company-ledger`,
-  and `imports` — expose only `list` and `show`. They do not expose generic
-  write commands.
+- **Inspect-only resources** — `activities`, `system-logs`, and
+  `company-ledger` — expose only safe reads. Import/preimport endpoints are not
+  listable resource families and need a dedicated guarded workflow before they
+  become first-class commands.
 - **`template` / `edit-template`** use Invoice Ninja's read-only `GET /create`
   and `GET /{id}/edit` routes. They return schema/default payloads and never
   create or update records.

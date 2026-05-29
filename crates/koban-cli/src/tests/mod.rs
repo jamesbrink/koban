@@ -8,13 +8,16 @@ use serde_json::Value;
 
 use koban::*;
 
-use crate::{cli::*, commands::*, invoice::*, payload::*, render::*};
+use crate::{cli::*, commands::*, invoice::*, payload::*, render::*, resource_routes::*};
 
 mod cli;
 mod commands;
+mod endpoints;
 mod invoice;
 mod payload;
 mod render;
+mod resource_actions;
+mod resource_parity;
 
 fn empty_payload_args() -> InvoicePayloadArgs {
     InvoicePayloadArgs {

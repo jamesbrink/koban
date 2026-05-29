@@ -25,6 +25,11 @@ fn write_download_file_writes_bytes_and_reports_write_errors() {
 
     let error = write_download_file(tempdir.path(), b"pdf".to_vec(), true).expect_err("directory");
     assert!(matches!(error, KobanError::File { .. }));
+    assert!(
+        error
+            .to_string()
+            .contains(&tempdir.path().display().to_string())
+    );
 }
 
 #[test]
@@ -258,7 +263,7 @@ async fn expanded_resource_and_endpoint_dry_runs_do_not_touch_network() {
     .await
     .expect("purchase order update dry run");
     assert!(
-        update.contains("api/v1/purchase_orders/po_1"),
+        update.contains("api/v1/purchase_order/po_1"),
         "got: {update}"
     );
     assert!(update.contains("\"line_items\""), "got: {update}");
@@ -356,8 +361,8 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
     let upload = execute_with_config(
         Cli {
             output: OutputFormat::Json,
-            command: Some(Commands::Documents(ResourceCommand::Upload(UploadArgs {
-                id: "document_1".to_string(),
+            command: Some(Commands::Clients(ResourceCommand::Upload(UploadArgs {
+                id: "client_1".to_string(),
                 files: vec![upload_file],
                 safety: WriteSafetyArgs {
                     dry_run: true,
@@ -369,7 +374,7 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
         config.clone(),
     )
     .await
-    .expect("document upload dry run");
+    .expect("client upload dry run");
     assert!(upload.contains("\"method\": \"POST\""), "got: {upload}");
 
     let get_action = execute_with_config(
@@ -393,15 +398,11 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
     .await
     .expect("recurring invoice action dry run");
     assert!(
-        get_action.contains("\"method\": \"POST\""),
+        get_action.contains("\"method\": \"GET\""),
         "got: {get_action}"
     );
     assert!(
-        get_action.contains("api/v1/recurring_invoices/bulk"),
-        "got: {get_action}"
-    );
-    assert!(
-        get_action.contains("\"ids\": [\n      \"recurring_1\"\n    ]"),
+        get_action.contains("api/v1/recurring_invoices/recurring_1/start"),
         "got: {get_action}"
     );
 
@@ -434,7 +435,7 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
         "got: {post_action}"
     );
     assert!(
-        post_action.contains("api/v1/clients/bulk"),
+        post_action.contains("api/v1/clients/client_1/updateTaxData"),
         "got: {post_action}"
     );
 }
@@ -524,122 +525,6 @@ async fn generic_resource_and_endpoint_writes_require_confirmation_without_dry_r
         endpoint_error,
         KobanError::ConfirmationRequired { .. }
     ));
-}
-
-#[tokio::test]
-async fn utility_defaults_to_safe_ping_get() {
-    let config = Config::from_values("http://localhost:1234", "token").expect("config");
-    let output = execute_with_config(
-        Cli {
-            output: OutputFormat::Json,
-            command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
-                endpoint: None,
-                method: None,
-                payload: empty_resource_payload_args(),
-                safety: WriteSafetyArgs {
-                    dry_run: true,
-                    yes: false,
-                },
-                include: Vec::new(),
-            }))),
-        },
-        config,
-    )
-    .await
-    .expect("utility ping dry run");
-    assert!(output.contains("\"method\": \"GET\""), "got: {output}");
-    assert!(
-        output.contains("\"path\": \"api/v1/ping\""),
-        "got: {output}"
-    );
-}
-
-#[tokio::test]
-async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
-    let config = Config::from_values("http://localhost:1234", "token").expect("config");
-
-    for method in [HttpMethod::Get, HttpMethod::Delete] {
-        let error = execute_with_config(
-            Cli {
-                output: OutputFormat::Json,
-                command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
-                    endpoint: None,
-                    method: Some(method),
-                    payload: {
-                        let mut args = empty_resource_payload_args();
-                        args.fields.push("query=acme".to_string());
-                        args
-                    },
-                    safety: WriteSafetyArgs {
-                        dry_run: true,
-                        yes: false,
-                    },
-                    include: Vec::new(),
-                }))),
-            },
-            config.clone(),
-        )
-        .await
-        .expect_err("bodyless endpoint method should reject payload");
-        assert!(matches!(error, KobanError::InvalidPayload { .. }));
-        assert!(error.to_string().contains(method.label()), "got: {error}");
-    }
-}
-
-#[tokio::test]
-async fn utility_rejects_write_methods() {
-    let config = Config::from_values("http://localhost:1234", "token").expect("config");
-
-    for method in [HttpMethod::Post, HttpMethod::Put, HttpMethod::Delete] {
-        let error = execute_with_config(
-            Cli {
-                output: OutputFormat::Json,
-                command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
-                    endpoint: Some("imports/import_1".to_string()),
-                    method: Some(method),
-                    payload: empty_resource_payload_args(),
-                    safety: WriteSafetyArgs {
-                        dry_run: false,
-                        yes: true,
-                    },
-                    include: Vec::new(),
-                }))),
-            },
-            config.clone(),
-        )
-        .await
-        .expect_err("utility writes should be rejected");
-        assert!(matches!(error, KobanError::InvalidPayload { .. }));
-        assert!(error.to_string().contains("read-only"), "got: {error}");
-    }
-}
-
-#[tokio::test]
-async fn endpoint_overrides_reject_write_methods() {
-    let config = Config::from_values("http://localhost:1234", "token").expect("config");
-
-    for endpoint in ["clients/client_1/purge", "reports"] {
-        let error = execute_with_config(
-            Cli {
-                output: OutputFormat::Json,
-                command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
-                    endpoint: Some(endpoint.to_string()),
-                    method: Some(HttpMethod::Post),
-                    payload: empty_resource_payload_args(),
-                    safety: WriteSafetyArgs {
-                        dry_run: true,
-                        yes: false,
-                    },
-                    include: Vec::new(),
-                }))),
-            },
-            config.clone(),
-        )
-        .await
-        .expect_err("custom endpoint writes should be rejected");
-        assert!(matches!(error, KobanError::InvalidPayload { .. }));
-        assert!(error.to_string().contains("read-only"), "got: {error}");
-    }
 }
 
 #[tokio::test]
@@ -1043,6 +928,10 @@ fn expanded_resource_create_commands() -> Vec<(&'static str, Commands)> {
             Commands::RecurringExpenses(create_command()),
         ),
         (
+            "recurring quotes",
+            Commands::RecurringQuotes(create_command()),
+        ),
+        (
             "bank transactions",
             Commands::BankTransactions(create_command()),
         ),
@@ -1054,14 +943,17 @@ fn expanded_resource_create_commands() -> Vec<(&'static str, Commands)> {
             "bank transaction rules",
             Commands::BankTransactionRules(create_command()),
         ),
+        ("group settings", Commands::GroupSettings(create_command())),
         (
             "expense categories",
             Commands::ExpenseCategories(create_command()),
         ),
-        ("tax rates", Commands::TaxRates(create_command())),
         ("payment terms", Commands::PaymentTerms(create_command())),
+        (
+            "task schedulers",
+            Commands::TaskSchedulers(create_command()),
+        ),
         ("task statuses", Commands::TaskStatuses(create_command())),
-        ("documents", Commands::Documents(create_command())),
         ("designs", Commands::Designs(create_command())),
         ("templates", Commands::Templates(create_command())),
         ("users", Commands::Users(create_command())),
