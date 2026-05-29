@@ -5,10 +5,24 @@ use httpmock::{
 };
 use predicates::prelude::*;
 use serde_json::json;
-use tempfile::tempdir;
+use std::path::Path;
+use std::sync::OnceLock;
+use tempfile::{TempDir, tempdir};
+
+/// An empty config directory shared by every command in this suite so the CLI
+/// never reads the developer's (or CI's) real stored credentials. Resolution
+/// stays env-first; with no env token and no stored file, the CLI reports a
+/// missing token deterministically regardless of the host machine's state.
+fn isolated_config_dir() -> &'static Path {
+    static DIR: OnceLock<TempDir> = OnceLock::new();
+    DIR.get_or_init(|| tempdir().expect("config tempdir"))
+        .path()
+}
 
 fn koban() -> Command {
-    Command::cargo_bin("koban").expect("koban binary")
+    let mut cmd = Command::cargo_bin("koban").expect("koban binary");
+    cmd.env("KOBAN_CONFIG_DIR", isolated_config_dir());
+    cmd
 }
 
 #[test]
@@ -109,6 +123,8 @@ fn no_args_prints_help() {
 
 #[test]
 fn missing_token_is_actionable() {
+    // The `koban()` helper isolates KOBAN_CONFIG_DIR, so dropping the env token
+    // leaves no stored credential to fall back to on any host machine.
     koban()
         .env_remove("INVOICE_NINJA_API_TOKEN")
         .env_remove("INVOICE_NINJA_BASE_URL")
