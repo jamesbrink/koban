@@ -38,6 +38,71 @@ fn push_filters_rejects_empty_keys() {
     assert!(matches!(error, KobanError::InvalidFilter { .. }));
 }
 
+#[test]
+fn unrecognized_invoice_client_status_is_flagged() {
+    // The exact correctness trap: `outstanding` looks valid but is ignored.
+    let warning = unrecognized_client_status_warning(
+        Resource::Invoices,
+        &["client_status=outstanding".to_string()],
+    )
+    .expect("unknown value should warn");
+    assert!(warning.contains("outstanding"));
+    assert!(warning.contains("unpaid"));
+    assert!(warning.contains("silently ignores"));
+}
+
+#[test]
+fn recognized_invoice_client_status_does_not_warn() {
+    for value in [
+        "all",
+        "draft",
+        "paid",
+        "unpaid",
+        "overdue",
+        "unpaid,overdue",
+    ] {
+        assert!(
+            unrecognized_client_status_warning(
+                Resource::Invoices,
+                &[format!("client_status={value}")],
+            )
+            .is_none(),
+            "valid value should not warn: {value}"
+        );
+    }
+}
+
+#[test]
+fn client_status_warning_only_flags_the_unknown_part_of_a_list() {
+    let warning = unrecognized_client_status_warning(
+        Resource::Invoices,
+        &["client_status=unpaid,bogus".to_string()],
+    )
+    .expect("mixed list should warn");
+    assert!(warning.contains("bogus"));
+    assert!(
+        !warning.contains("unpaid,bogus"),
+        "only the unknown value is named"
+    );
+}
+
+#[test]
+fn client_status_warning_is_scoped_to_invoices() {
+    // Quotes use a different status enum we do not validate, so no warning.
+    assert!(
+        unrecognized_client_status_warning(
+            Resource::Quotes,
+            &["client_status=whatever".to_string()],
+        )
+        .is_none()
+    );
+    // Other filter keys are forwarded raw without a warning.
+    assert!(
+        unrecognized_client_status_warning(Resource::Invoices, &["status_id=gt:1".to_string()],)
+            .is_none()
+    );
+}
+
 #[tokio::test]
 async fn execute_handles_non_network_commands_without_configured_endpoint() {
     let config = Config::from_values("http://localhost:1234", "token").expect("config");

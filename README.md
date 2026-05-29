@@ -66,6 +66,29 @@ cargo install koban-cli
 nix run github:jamesbrink/koban -- --help
 ```
 
+## Use with AI agents
+
+koban is built to be driven by AI coding agents. One command teaches your agent
+the whole CLI:
+
+```sh
+koban skill install --target all          # Claude Code, Codex, and an AGENTS.md block
+koban skill install --target claude-code  # or pick a single harness
+koban skill generate                      # write to ./koban-skills to review first
+```
+
+Once the skill is installed, an agent can **track your work in Invoice Ninja
+automatically** — logging billable tasks and time, drafting and sending
+invoices, recording expenses, and reporting on outstanding balances — while it
+works, instead of you context-switching to the web UI. The skill teaches the
+agent koban's stable JSON output and its `--dry-run`/`--yes` safety gates, so
+every write is previewed before it happens.
+
+Supported harnesses include Claude Code, OpenAI Codex CLI, pi, Cursor, Claude
+Desktop, and any tool that reads `AGENTS.md` (Windsurf, Gemini CLI, Aider,
+Copilot, Zed, …). See the
+[agent skill docs](https://jamesbrink.online/koban/commands/skill).
+
 ## Current CLI
 
 ```sh
@@ -387,10 +410,23 @@ The documentation website lives in `website/` (VitePress) and is published to
 GitHub Pages at <https://jamesbrink.online/koban/> by
 `.github/workflows/pages.yml` on pushes to `main` that touch `website/`.
 
-The devshell also loads `INVOICE_NINJA_API_TOKEN` and
-`INVOICE_NINJA_BASE_URL` from a local gitignored `.env` file when those
-variables are not already set in the shell. For routine live smoke testing, use
-the demo values:
+To keep this repo safe for AI agents, the devshell **forces koban to the public
+demo endpoint by default**: it exports the demo `INVOICE_NINJA_BASE_URL` /
+`INVOICE_NINJA_API_TOKEN` (overriding any `.env` or inherited values) and points
+`KOBAN_CONFIG_DIR` at a gitignored repo-local `.koban/`, so a stored
+`koban auth login` credential is never resolved here. An agent loading the koban
+skill can only reach the demo account.
+
+To use live credentials for an intentional check, enter the shell with
+`KOBAN_ALLOW_LIVE=1`:
+
+```sh
+KOBAN_ALLOW_LIVE=1 nix develop
+```
+
+Under `KOBAN_ALLOW_LIVE=1`, `INVOICE_NINJA_API_TOKEN` and
+`INVOICE_NINJA_BASE_URL` are loaded from a local gitignored `.env` file when not
+already set in the shell, and the stored credential is reachable:
 
 ```dotenv
 INVOICE_NINJA_API_TOKEN=TOKEN

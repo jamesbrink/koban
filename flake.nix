@@ -168,39 +168,61 @@
 
             devshell.startup.load-env = {
               text = ''
-                if [ -f .env ]; then
-                  koban_load_dotenv_var() {
-                    local key="$1"
-                    local value
-                    value="$(
-                      awk -F= -v key="$key" '
-                        /^[[:space:]]*(#|$)/ { next }
-                        {
-                          raw_key = $1
-                          sub(/^[[:space:]]*/, "", raw_key)
-                          sub(/[[:space:]]*$/, "", raw_key)
-                          if (raw_key != key) { next }
+                # In this repo koban is pinned to the public Invoice Ninja demo
+                # so an agent (Claude Code, Codex, ...) that loads the koban
+                # skill here can never reach a production or personal account.
+                # Opt into live credentials deliberately by entering the shell
+                # with KOBAN_ALLOW_LIVE=1; then `.env`, any exported
+                # INVOICE_NINJA_*, and a stored `koban auth login` credential are
+                # used as usual.
+                if [ "''${KOBAN_ALLOW_LIVE:-}" = "1" ]; then
+                  # Live opt-in: load INVOICE_NINJA_* from a gitignored .env when
+                  # not already set in the shell, and leave KOBAN_CONFIG_DIR
+                  # alone so the stored credential is reachable.
+                  if [ -f .env ]; then
+                    koban_load_dotenv_var() {
+                      local key="$1"
+                      local value
+                      value="$(
+                        awk -F= -v key="$key" '
+                          /^[[:space:]]*(#|$)/ { next }
+                          {
+                            raw_key = $1
+                            sub(/^[[:space:]]*/, "", raw_key)
+                            sub(/[[:space:]]*$/, "", raw_key)
+                            if (raw_key != key) { next }
 
-                          value = substr($0, index($0, "=") + 1)
-                          sub(/^[[:space:]]*/, "", value)
-                          sub(/[[:space:]]*$/, "", value)
-                          sub(/\r$/, "", value)
-                          if (substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") {
-                            value = substr(value, 2, length(value) - 2)
+                            value = substr($0, index($0, "=") + 1)
+                            sub(/^[[:space:]]*/, "", value)
+                            sub(/[[:space:]]*$/, "", value)
+                            sub(/\r$/, "", value)
+                            if (substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") {
+                              value = substr(value, 2, length(value) - 2)
+                            }
+                            print value
+                            exit
                           }
-                          print value
-                          exit
-                        }
-                      ' .env
-                    )"
-                    if [ -n "$value" ] && [ -z "''${!key:-}" ]; then
-                      export "$key=$value"
-                    fi
-                  }
+                        ' .env
+                      )"
+                      if [ -n "$value" ] && [ -z "''${!key:-}" ]; then
+                        export "$key=$value"
+                      fi
+                    }
 
-                  koban_load_dotenv_var INVOICE_NINJA_API_TOKEN
-                  koban_load_dotenv_var INVOICE_NINJA_BASE_URL
-                  unset -f koban_load_dotenv_var
+                    koban_load_dotenv_var INVOICE_NINJA_API_TOKEN
+                    koban_load_dotenv_var INVOICE_NINJA_BASE_URL
+                    unset -f koban_load_dotenv_var
+                  fi
+                  echo "koban: KOBAN_ALLOW_LIVE=1 — using live credentials, NOT the demo pin." >&2
+                else
+                  # Default: force the demo endpoint, overriding any inherited or
+                  # .env value, and isolate KOBAN_CONFIG_DIR to a gitignored
+                  # repo-local dir so a stored production credential is never
+                  # resolved here. This holds even if .env already contains real
+                  # credentials from prior local use.
+                  export INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
+                  export INVOICE_NINJA_API_TOKEN="TOKEN"
+                  export KOBAN_CONFIG_DIR="''${PRJ_ROOT:-$PWD}/.koban"
                 fi
               '';
             };
@@ -313,9 +335,22 @@
                     echo "Set KOBAN_LIVE_WRITE_SMOKE=1 to run this mutating demo smoke test." >&2
                     exit 2
                   fi
-                  readonly INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
-                  readonly INVOICE_NINJA_API_TOKEN="TOKEN"
+                  # Mutating helper: only ever touch the public demo API. Warn
+                  # (without echoing the secret) if a non-demo credential was
+                  # inherited from the devshell .env, then hard-code demo.
+                  DEMO_BASE_URL="https://demo.invoiceninja.com"
+                  DEMO_API_TOKEN="TOKEN"
+                  if { [ -n "''${INVOICE_NINJA_API_TOKEN:-}" ] && [ "''${INVOICE_NINJA_API_TOKEN}" != "''${DEMO_API_TOKEN}" ]; } ||
+                    { [ -n "''${INVOICE_NINJA_BASE_URL:-}" ] && [ "''${INVOICE_NINJA_BASE_URL}" != "''${DEMO_BASE_URL}" ]; }; then
+                    echo "Ignoring inherited Invoice Ninja credentials; this smoke test only uses the public demo." >&2
+                  fi
+                  readonly INVOICE_NINJA_BASE_URL="''${DEMO_BASE_URL}"
+                  readonly INVOICE_NINJA_API_TOKEN="''${DEMO_API_TOKEN}"
                   export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN
+                  if [ "''${INVOICE_NINJA_BASE_URL}" != "''${DEMO_BASE_URL}" ] || [ "''${INVOICE_NINJA_API_TOKEN}" != "''${DEMO_API_TOKEN}" ]; then
+                    echo "Refusing to run: smoke endpoint is not the public Invoice Ninja demo API." >&2
+                    exit 1
+                  fi
                   echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
                   client_id="$(

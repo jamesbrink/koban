@@ -82,7 +82,7 @@ async fn endpoint_invalid_paths_fail_before_network() {
     )
     .await
     .expect_err("route-changing endpoint path should fail");
-    assert!(matches!(error, KobanError::InvalidPayload { .. }));
+    assert!(matches!(error, KobanError::InvalidRequest { .. }));
     assert!(
         error.to_string().contains("relative /api/v1 path"),
         "got: {error}"
@@ -116,7 +116,7 @@ async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
         )
         .await
         .expect_err("bodyless endpoint method should reject payload");
-        assert!(matches!(error, KobanError::InvalidPayload { .. }));
+        assert!(matches!(error, KobanError::InvalidRequest { .. }));
         assert!(error.to_string().contains(method.label()), "got: {error}");
     }
 }
@@ -207,7 +207,7 @@ async fn utility_rejects_write_methods() {
         )
         .await
         .expect_err("utility writes should be rejected");
-        assert!(matches!(error, KobanError::InvalidPayload { .. }));
+        assert!(matches!(error, KobanError::InvalidRequest { .. }));
         assert!(error.to_string().contains("read-only"), "got: {error}");
     }
 }
@@ -298,7 +298,7 @@ async fn endpoint_overrides_reject_write_methods() {
         )
         .await
         .expect_err("custom endpoint writes should be rejected");
-        assert!(matches!(error, KobanError::InvalidPayload { .. }));
+        assert!(matches!(error, KobanError::InvalidRequest { .. }));
         assert!(error.to_string().contains("read-only"), "got: {error}");
     }
 }

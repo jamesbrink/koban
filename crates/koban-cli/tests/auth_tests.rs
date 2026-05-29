@@ -12,6 +12,21 @@ fn koban() -> Command {
 }
 
 #[test]
+fn status_does_not_pick_up_a_real_stored_credential_when_isolated() {
+    // Regression guard for test/credential isolation: pointed at an empty
+    // config dir with no env token, resolution must report nothing — never
+    // the developer's or CI machine's real `koban auth login` credential.
+    // `auth status` reads credentials without any network call.
+    let dir = tempdir().expect("tempdir");
+    koban()
+        .env("KOBAN_CONFIG_DIR", dir.path())
+        .args(["auth", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Not authenticated"));
+}
+
+#[test]
 fn login_no_verify_writes_config_and_status_reports_it() {
     let dir = tempdir().expect("tempdir");
 

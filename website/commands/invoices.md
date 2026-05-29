@@ -14,6 +14,18 @@ koban invoices template --output json
 koban invoices edit-template <id> --output json
 ```
 
+::: warning Filters are forwarded raw
+`--filter key=value` is passed straight to Invoice Ninja, which **silently
+ignores unknown keys and unknown values and returns the full set** — always
+sanity-check the row count. For outstanding invoices use
+`--filter client_status=unpaid` (and `overdue`), **not** `outstanding`, which is
+ignored. Valid invoice values: `all`, `draft`, `paid`, `unpaid`, `overdue`.
+:::
+
+List rows carry a numeric `status_id` (not present in `statics`): `1` draft,
+`2` sent, `3` partial, `4` paid, `5` cancelled, `6` reversed. "Outstanding
+balance" means `balance > 0`.
+
 ## Create & update
 
 ```sh

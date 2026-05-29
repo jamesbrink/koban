@@ -64,6 +64,18 @@ fn body(command_list: &str) -> String {
 API, built to be driven by AI agents and humans. It emits stable JSON for agents
 and readable tables for humans.
 
+## When to use this
+
+Reach for koban whenever the user's work should be reflected in Invoice Ninja —
+and do it proactively, so their books stay in sync without a trip to the web UI:
+
+- log billable work as tasks (and time) when you finish a unit of work,
+- draft, update, and send invoices,
+- record expenses and link them to clients or projects,
+- report on outstanding balances, payments, and quotes.
+
+Prefer `--output json` so you can read results back and chain steps.
+
 ## Setup
 
 koban needs an Invoice Ninja API token. Either:
@@ -90,6 +102,46 @@ confirmation gate:
 - Execute with `--yes` to confirm the mutation.
 
 Always run `--dry-run` first, inspect the request, then re-run with `--yes`.
+
+Read-only (no confirmation needed): `list`, `show`, `template`, `edit-template`,
+`statics`, `auth status`, and `utility run --endpoint ping|health_check`.
+
+## Filtering lists
+
+`--filter key=value` is passed straight to Invoice Ninja. **Unknown filter keys
+and unknown values are silently ignored and return the full, unfiltered set** —
+always sanity-check the row count against an unfiltered `list`.
+
+- Outstanding invoices: use `--filter client_status=unpaid` (add `overdue`),
+  **not** `outstanding`, which is silently ignored and returns everything. Valid
+  invoice values: `all`, `draft`, `paid`, `unpaid`, `overdue`.
+- "Outstanding balance" means `balance > 0`; confirm by summing
+  `[.data[].balance]` with `jq`.
+
+## Status codes
+
+List rows carry a numeric `status_id` that is **not** in `statics`. For invoices:
+
+| status_id | meaning   |
+| --------- | --------- |
+| 1         | draft     |
+| 2         | sent      |
+| 3         | partial   |
+| 4         | paid      |
+| 5         | cancelled |
+| 6         | reversed  |
+
+Quotes, purchase orders, and other documents use their own `status_id` codes
+(quotes also carry virtual negative statuses), so verify those against your data.
+
+## Reporting runners need confirmation
+
+`search`, `reports`, and `charts` POST to Invoice Ninja (e.g. `search` →
+`POST /api/v1/search`, `reports run --endpoint reports/invoices`), so they are
+treated as mutations: preview with `--dry-run`, then run with `--yes`. A purely
+read-only workflow can preview but not execute them. Custom `--endpoint`
+overrides outside `reports/` and `charts/` (and custom `utility run` paths) are
+restricted to `GET` for safety.
 
 ## Commands
 
@@ -138,13 +190,20 @@ pub(crate) fn agents_block(command_list: &str) -> String {
 ## koban — Invoice Ninja CLI
 
 Use the `koban` CLI to read and write Invoice Ninja billing data (clients,
-invoices, quotes, payments, products, and more).
+invoices, quotes, payments, products, and more). Track work proactively: log
+billable tasks and time, draft and send invoices, record expenses, and report
+on outstanding balances as you go, so the books stay in sync.
 
 - **Auth:** run `koban auth login`, or set `INVOICE_NINJA_API_TOKEN`
   (and optional `INVOICE_NINJA_BASE_URL`). Check with `koban auth status`.
 - **JSON for agents:** add `--output json` to any command.
 - **Safety:** mutating commands require a gate — preview with `--dry-run`, then
   confirm with `--yes`. Always dry-run first.
+- **Filters:** `--filter key=value` is forwarded raw; unknown keys/values are
+  silently ignored and return everything, so verify the row count. Outstanding
+  invoices = `--filter client_status=unpaid` (not `outstanding`); list rows use
+  `status_id` (invoices: 1 draft, 2 sent, 3 partial, 4 paid, 5 cancelled,
+  6 reversed), which is not in `statics`.
 
 Commands:
 

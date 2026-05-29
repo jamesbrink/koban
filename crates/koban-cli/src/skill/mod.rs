@@ -289,11 +289,20 @@ fn zip_skill(skill: &str) -> Result<Vec<u8>> {
 }
 
 fn render_summary(output: OutputFormat, mode: Mode, written: &[String]) -> Result<String> {
+    // `generate` writes a review copy; nudge the user toward activating it.
+    let hint = (mode == Mode::Generate).then(install_hint);
+
     match output {
-        OutputFormat::Json => to_json(&json!({
-            "mode": mode.label(),
-            "written": written,
-        })),
+        OutputFormat::Json => {
+            let mut payload = json!({
+                "mode": mode.label(),
+                "written": written,
+            });
+            if let Some(hint) = &hint {
+                payload["hint"] = json!(hint);
+            }
+            to_json(&payload)
+        }
         OutputFormat::Table => {
             let mut lines = vec![format!(
                 "Wrote {} file(s) ({}):",
@@ -309,9 +318,22 @@ fn render_summary(output: OutputFormat, mode: Mode, written: &[String]) -> Resul
                         .to_string(),
                 );
             }
+            if let Some(hint) = &hint {
+                lines.push(String::new());
+                lines.push(hint.clone());
+            }
             Ok(lines.join("\n"))
         }
     }
+}
+
+/// Guidance shown after `generate`: how to turn the review copy into a live
+/// skill, with a manual-copy escape hatch for non-standard layouts.
+fn install_hint() -> String {
+    "These files are for review. Activate the skill with `koban skill install` \
+     (add --global for user-level, or --target to choose a harness), or copy \
+     them into your harness configuration directories manually."
+        .to_string()
 }
 
 fn to_json(value: &Value) -> Result<String> {

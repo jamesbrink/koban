@@ -39,7 +39,7 @@ async fn execute_endpoint_run(
         && !is_scoped_query_endpoint(default_endpoint, &endpoint)
         && !matches!(method, HttpMethod::Get)
     {
-        return Err(KobanError::InvalidPayload {
+        return Err(KobanError::InvalidRequest {
             message: "custom and utility endpoint runners are read-only; use --method get"
                 .to_string(),
         });
@@ -51,7 +51,7 @@ async fn execute_endpoint_run(
     )?;
     let has_body = body.as_object().is_some_and(|body| !body.is_empty());
     if has_body && matches!(method, HttpMethod::Get | HttpMethod::Delete) {
-        return Err(KobanError::InvalidPayload {
+        return Err(KobanError::InvalidRequest {
             message: format!(
                 "{} endpoint commands do not send request bodies; use --method post or --method put for payload fields",
                 method.label()
@@ -113,7 +113,7 @@ fn validate_endpoint_path(path: &str) -> Result<()> {
     if is_safe {
         Ok(())
     } else {
-        Err(KobanError::InvalidPayload {
+        Err(KobanError::InvalidRequest {
             message: "endpoint must be a relative /api/v1 path".to_string(),
         })
     }
