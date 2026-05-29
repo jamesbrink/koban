@@ -71,10 +71,10 @@ dedicated guarded workflow.
 These are not resource families; they run named endpoints (see
 [Endpoint runners](/commands/endpoints)):
 
-| CLI name  | Command          |
-| --------- | ---------------- |
+| CLI name  | Command                      |
+| --------- | ---------------------------- |
 | `reports` | `run --endpoint reports/...` |
 | `charts`  | `run --endpoint charts/...`  |
-| `search`  | `run`                       |
-| `utility` | `run`            |
-| `statics` | (top-level read) |
+| `search`  | `run`                        |
+| `utility` | `run`                        |
+| `statics` | (top-level read)             |

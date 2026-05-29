@@ -103,6 +103,8 @@ export default defineConfig({
             { text: 'Resource commands', link: '/commands/resources' },
             { text: 'Invoices', link: '/commands/invoices' },
             { text: 'Endpoint runners', link: '/commands/endpoints' },
+            { text: 'Authentication', link: '/commands/auth' },
+            { text: 'Agent skill', link: '/commands/skill' },
           ],
         },
       ],

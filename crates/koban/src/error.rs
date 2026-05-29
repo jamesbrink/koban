@@ -11,7 +11,7 @@ pub enum KobanError {
     #[cfg_attr(
         feature = "miette",
         diagnostic(help(
-            "Set INVOICE_NINJA_API_TOKEN in your shell, then retry the command. Koban will not call Invoice Ninja without an explicit token."
+            "Run `koban auth login` to store a token, or set INVOICE_NINJA_API_TOKEN in your shell. Koban will not call Invoice Ninja without an explicit token."
         ))
     )]
     MissingToken,
@@ -106,6 +106,15 @@ pub enum KobanError {
         ))
     )]
     Update { message: String },
+
+    #[error("could not access stored credentials: {message}")]
+    #[cfg_attr(
+        feature = "miette",
+        diagnostic(help(
+            "Check the koban config directory (override it with KOBAN_CONFIG_DIR) and, when using --keychain, that your OS keychain is unlocked and reachable."
+        ))
+    )]
+    Credential { message: String },
 }
 
 /// Convenience alias for results returned by the koban library.

@@ -1,6 +1,11 @@
-use std::{fmt, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
+
+// Cohesive types extracted to keep this module focused and within budget;
+// re-exported so `crate::cli::{AuthCommand, CompletionShell, ...}` stays stable.
+pub use crate::cli_agent::{AuthCommand, AuthLoginArgs, SkillArgs, SkillCommand, SkillTarget};
+pub use crate::completion::CompletionShell;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -37,31 +42,6 @@ pub struct Cli {
 pub enum OutputFormat {
     Table,
     Json,
-}
-
-#[derive(Debug, Clone, ValueEnum, PartialEq, Eq)]
-pub enum CompletionShell {
-    Bash,
-    Elvish,
-    Fish,
-    Nushell,
-    #[value(name = "powershell", alias = "power-shell")]
-    PowerShell,
-    Zsh,
-}
-
-impl fmt::Display for CompletionShell {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = match self {
-            Self::Bash => "bash",
-            Self::Elvish => "elvish",
-            Self::Fish => "fish",
-            Self::Nushell => "nushell",
-            Self::PowerShell => "powershell",
-            Self::Zsh => "zsh",
-        };
-        f.write_str(value)
-    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -240,6 +220,14 @@ Examples:
     /// Call utility endpoints such as ping, health-check, refresh, and preview
     #[command(subcommand)]
     Utility(EndpointCommand),
+
+    /// Store, inspect, and remove Invoice Ninja credentials
+    #[command(subcommand)]
+    Auth(AuthCommand),
+
+    /// Generate or install an agent skill that teaches a harness to use koban
+    #[command(subcommand)]
+    Skill(SkillCommand),
 
     /// Check or install GitHub release updates
     #[command(after_long_help = "\
