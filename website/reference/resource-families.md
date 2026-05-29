@@ -5,7 +5,8 @@ koban exposes Invoice Ninja resources through three command profiles:
 - **Full** — the complete [resource command shape](/commands/resources): `list`,
   `show`, `template`, `edit-template`, `create`, `update`, `delete`, `bulk`,
   `action`, `upload`.
-- **Inspect-only** — `list` and `show` only. No generic write commands.
+- **Inspect-only** — safe read commands only; `show` is available only when the
+  official API publishes a single-record route. No generic write commands.
 - **Invoices** — the full shape plus `download` and `delivery-note`.
 - **Guarded partial** — generic commands are present, but commands for routes
   not published by the official API fail locally with an explicit message.

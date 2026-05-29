@@ -402,6 +402,9 @@ async fn execute_resource_action(
     let mut query = Vec::new();
     push_include(&mut query, args.include);
     let route = resource_action_route(resource, &args.id, &args.action);
+    if route.is_bulk {
+        require_resource_capability(resource, ResourceCapability::Bulk)?;
+    }
     let body = resource_payload(
         args.payload,
         matches!(route.method, HttpMethod::Post | HttpMethod::Put),

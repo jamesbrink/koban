@@ -5,7 +5,7 @@ use koban::{KobanError, Result};
 pub(crate) fn write_download_file(path: &Path, bytes: Vec<u8>, force: bool) -> Result<()> {
     ensure_download_path(path, force)?;
     fs::write(path, bytes).map_err(|source| KobanError::File {
-        message: source.to_string(),
+        message: format!("could not write {}: {source}", path.display()),
     })
 }
 

@@ -103,6 +103,33 @@ async fn get_resource_actions_reject_payloads_before_network() {
 }
 
 #[tokio::test]
+async fn bulk_backed_actions_respect_resource_bulk_guards() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    let error = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Locations(ResourceCommand::Action(
+                ResourceActionArgs {
+                    id: "location_1".to_string(),
+                    action: "archive".to_string(),
+                    payload: empty_resource_payload_args(),
+                    safety: WriteSafetyArgs {
+                        dry_run: true,
+                        yes: false,
+                    },
+                    include: Vec::new(),
+                },
+            ))),
+        },
+        config,
+    )
+    .await
+    .expect_err("locations do not support bulk-backed actions");
+    assert!(error.to_string().contains("does not support `bulk`"));
+}
+
+#[tokio::test]
 async fn unsupported_pdf_downloads_fail_before_network() {
     let config = Config::from_values("http://localhost:1234", "token").expect("config");
     let tempdir = tempfile::tempdir().expect("tempdir");

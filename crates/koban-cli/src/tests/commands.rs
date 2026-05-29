@@ -25,6 +25,11 @@ fn write_download_file_writes_bytes_and_reports_write_errors() {
 
     let error = write_download_file(tempdir.path(), b"pdf".to_vec(), true).expect_err("directory");
     assert!(matches!(error, KobanError::File { .. }));
+    assert!(
+        error
+            .to_string()
+            .contains(&tempdir.path().display().to_string())
+    );
 }
 
 #[test]
