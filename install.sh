@@ -7,7 +7,10 @@
 #
 # Options:
 #   KOBAN_INSTALL_DIR  install directory (default: ~/.local/bin)
-#   KOBAN_VERSION      release tag, such as v0.1.0 (default: latest)
+#   KOBAN_VERSION      release to install (default: latest)
+#                        latest   newest stable release
+#                        nightly  rolling prerelease built from main
+#                        vX.Y.Z   a specific tag, such as v0.1.0
 
 set -e
 
@@ -15,6 +18,31 @@ REPO="jamesbrink/koban"
 VERSION="${KOBAN_VERSION:-latest}"
 INSTALL_DIR="${KOBAN_INSTALL_DIR:-$HOME/.local/bin}"
 BIN="koban"
+
+usage() {
+    cat >&2 <<EOF
+koban installer
+
+Usage:
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh
+
+Environment variables:
+  KOBAN_VERSION      release to install: latest (default), nightly, or a tag (vX.Y.Z)
+  KOBAN_INSTALL_DIR  install directory (default: \$HOME/.local/bin)
+
+Examples:
+  # latest stable release
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh
+  # rolling nightly build from main
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | KOBAN_VERSION=nightly sh
+  # a specific tag into a custom directory
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | KOBAN_VERSION=v0.1.0 KOBAN_INSTALL_DIR=/usr/local/bin sh
+EOF
+}
+
+case "${1:-}" in
+    -h|--help|help) usage; exit 0 ;;
+esac
 
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -77,8 +105,20 @@ echo "  from: ${URL}"
 echo "  to:   ${INSTALL_DIR}/${BIN}"
 
 if ! curl -fsSL "${URL}" -o "${TMPDIR}/${ASSET}"; then
-    echo "Error: failed to download ${URL}" >&2
-    echo "  Available releases: https://github.com/${REPO}/releases" >&2
+    echo "Error: failed to download ${ASSET} (${VERSION})." >&2
+    if [ "${VERSION}" = "latest" ]; then
+        echo "  No stable release was found at releases/latest." >&2
+        echo "  If koban has not had a tagged release yet, install the rolling nightly build:" >&2
+        echo "    curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | KOBAN_VERSION=nightly sh" >&2
+    elif [ "${VERSION}" = "nightly" ]; then
+        echo "  The nightly prerelease or its ${ASSET} asset was not found." >&2
+    else
+        echo "  Tag '${VERSION}' may not exist or has no ${ASSET} asset." >&2
+    fi
+    echo "  Browse releases:    https://github.com/${REPO}/releases" >&2
+    echo "  Install from source: cargo install koban-cli" >&2
+    echo "" >&2
+    usage
     exit 1
 fi
 
