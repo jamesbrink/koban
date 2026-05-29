@@ -153,11 +153,17 @@ koban <resource> action <id>
 The resource set includes `clients`, `invoices`, `payments`, `quotes`,
 `credits`, `vendors`, `expenses`, `projects`, `tasks`, `locations`, `products`,
 `recurring-invoices`, `purchase-orders`, `recurring-expenses`,
-`bank-transactions`, `bank-integrations`, `bank-transaction-rules`,
-`expense-categories`, `tax-rates`, `payment-terms`, `task-statuses`,
-`activities`, `system-logs`, `documents`, `designs`, `templates`, `users`,
-`companies`, `company-gateways`, `company-ledger`, `company-users`, `tokens`,
-`webhooks`, `imports`, `subscriptions`, and `client-gateway-tokens`.
+`recurring-quotes`, `bank-transactions`, `bank-integrations`,
+`bank-transaction-rules`, `group-settings`, `expense-categories`, `tax-rates`,
+`payment-terms`, `task-schedulers`, `task-statuses`, `activities`,
+`system-logs`, `documents`, `designs`, `templates`, `users`, `companies`,
+`company-gateways`, `company-ledger`, `company-users`, `tokens`, `webhooks`,
+`imports`, `subscriptions`, and `client-gateway-tokens`.
+
+Some official resources do not publish the complete generic route set. Koban
+keeps the generic command surface consistent but rejects unsupported routes
+locally before networking, for example `documents upload`, `tax-rates create`,
+and `templates list`.
 
 Inspect-only/high-risk resources `activities`, `system-logs`, `company-ledger`,
 and `imports` expose only `list` and `show`. They intentionally do not expose
@@ -191,8 +197,14 @@ PUT /api/v1/{resource}/{id}
 DELETE /api/v1/{resource}/{id}
 POST /api/v1/{resource}/bulk
 POST /api/v1/{resource}/{id}/upload
-POST /api/v1/{resource}/bulk   # single-record actions use a one-item ids list
+POST /api/v1/{resource}/bulk   # bulk-backed single-record actions use one id
 ```
+
+Resources with official single-record action routes use
+`GET /api/v1/{resource}/{id}/{action}` instead. This includes payments, quotes,
+purchase orders, recurring invoices, and recurring quotes. Client tax updates use
+`POST /api/v1/clients/{id}/updateTaxData`. Purchase-order update and delete use
+the official singular path, `PUT/DELETE /api/v1/purchase_order/{id}`.
 
 Create and update accept either one raw JSON source (`--data`, `--data-file`, or
 `--stdin`) or guided flags. Raw JSON cannot be combined with guided fields or
@@ -225,6 +237,9 @@ public demo API currently accepts `PUT /api/v1/invoices/{id}/upload`; Koban uses
 the live-compatible method for invoices and `POST` for generic resource uploads.
 Multipart uploads use the `documents[]` form field so repeatable `--file`
 arguments are sent as an array.
+
+PDF downloads are supported for invoices, quotes, credits, recurring invoices,
+and purchase orders through their official invitation-key download routes.
 
 Safety rules:
 
@@ -348,9 +363,10 @@ koban projects list --filter client_id=<client_id>
 koban tasks list --all --limit 50
 ```
 
-Generic resource single-record actions are represented as
-`POST /api/v1/{resource}/bulk` with the requested action and a one-item `ids`
-list, matching the upstream controller shape used by lifecycle actions.
+Generic resource single-record actions use Invoice Ninja's bulk endpoint when
+that is the published upstream shape. Resources with official single-record
+action routes, such as payments, quotes, purchase orders, recurring invoices,
+and recurring quotes, use `GET /api/v1/{resource}/{id}/{action}`.
 
 ## Open Questions
 

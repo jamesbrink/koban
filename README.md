@@ -131,8 +131,10 @@ koban search run --field query=acme --dry-run
 koban reports run --data-file report.json --dry-run
 ```
 
-Generic resource single-record actions are sent through Invoice Ninja's bulk
-action endpoint with a one-item `ids` list, matching the upstream API shape.
+Generic resource single-record actions use Invoice Ninja's bulk endpoint when
+that is the published upstream shape. Resources with official single-record
+action routes, such as payments, quotes, purchase orders, recurring invoices,
+and recurring quotes, use `GET /api/v1/{resource}/{id}/{action}`.
 Endpoint runner payload flags are accepted only for `POST` and `PUT`; `GET` and
 `DELETE` reject payloads so dry-runs cannot show a body that the live request
 would ignore.
@@ -202,6 +204,8 @@ koban <resource> action <id>
 koban <resource> upload <id>
 koban invoices download <invitation_key>
 koban invoices delivery-note <id>
+koban quotes download <invitation_key>
+koban purchase-orders download <invitation_key>
 koban search run
 koban reports run
 koban charts run
@@ -214,15 +218,20 @@ first-class resource commands for mutations.
 `<resource>` includes `clients`, `invoices`, `payments`, `quotes`, `credits`,
 `vendors`, `expenses`, `projects`, `tasks`, `locations`, `products`,
 `recurring-invoices`, `purchase-orders`, `recurring-expenses`,
-`bank-transactions`, `bank-integrations`, `bank-transaction-rules`,
-`expense-categories`, `tax-rates`, `payment-terms`, `task-statuses`,
-`activities`, `system-logs`, `documents`, `designs`, `templates`, `users`,
-`companies`, `company-gateways`, `company-ledger`, `company-users`, `tokens`,
-`webhooks`, `imports`, `subscriptions`, and `client-gateway-tokens`.
+`recurring-quotes`, `bank-transactions`, `bank-integrations`,
+`bank-transaction-rules`, `group-settings`, `expense-categories`, `tax-rates`,
+`payment-terms`, `task-schedulers`, `task-statuses`, `activities`,
+`system-logs`, `documents`, `designs`, `templates`, `users`, `companies`,
+`company-gateways`, `company-ledger`, `company-users`, `tokens`, `webhooks`,
+`imports`, `subscriptions`, and `client-gateway-tokens`.
 
 Inspect-only/high-risk groups `activities`, `system-logs`, `company-ledger`,
 and `imports` expose only `list` and `show`. They do not expose generic write
 commands.
+
+Some official resources publish narrower route sets than the generic command
+shape. Koban rejects unsupported commands locally before networking, such as
+`documents upload`, `tax-rates create`, or `templates list`.
 
 The `template` and `edit-template` commands use Invoice Ninja's read-only
 `GET /create` and `GET /{id}/edit` routes. They return default/editable payloads

@@ -35,26 +35,18 @@ pub struct Cli {
 
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
 pub enum OutputFormat {
-    /// Human-readable tables
     Table,
-    /// Machine-readable JSON
     Json,
 }
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, Eq)]
 pub enum CompletionShell {
-    /// Bash completion script
     Bash,
-    /// Elvish completion script
     Elvish,
-    /// Fish completion script
     Fish,
-    /// Nushell completion script
     Nushell,
-    /// PowerShell completion script
     #[value(name = "powershell", alias = "power-shell")]
     PowerShell,
-    /// Zsh completion script
     Zsh,
 }
 
@@ -137,6 +129,10 @@ Examples:
     #[command(name = "recurring-expenses", subcommand)]
     RecurringExpenses(ResourceCommand),
 
+    /// List, show, and manage recurring quotes
+    #[command(name = "recurring-quotes", subcommand)]
+    RecurringQuotes(ResourceCommand),
+
     /// List, show, and manage bank transactions
     #[command(name = "bank-transactions", subcommand)]
     BankTransactions(ResourceCommand),
@@ -149,6 +145,10 @@ Examples:
     #[command(name = "bank-transaction-rules", subcommand)]
     BankTransactionRules(ResourceCommand),
 
+    /// List, show, and manage group settings
+    #[command(name = "group-settings", subcommand)]
+    GroupSettings(ResourceCommand),
+
     /// List, show, and manage expense categories
     #[command(name = "expense-categories", subcommand)]
     ExpenseCategories(ResourceCommand),
@@ -160,6 +160,10 @@ Examples:
     /// List, show, and manage payment terms
     #[command(name = "payment-terms", subcommand)]
     PaymentTerms(ResourceCommand),
+
+    /// List, show, and manage task schedulers
+    #[command(name = "task-schedulers", subcommand)]
+    TaskSchedulers(ResourceCommand),
 
     /// List, show, and manage task statuses
     #[command(name = "task-statuses", subcommand)]
@@ -348,6 +352,9 @@ Examples:
 
     /// Run a custom resource action
     Action(ResourceActionArgs),
+
+    /// Save a resource PDF by invitation key when the API supports it
+    Download(DownloadArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -540,35 +547,27 @@ pub struct UpdateResourceArgs {
 
 #[derive(Debug, Args)]
 pub struct ResourcePayloadArgs {
-    /// Raw JSON payload
     #[arg(long, value_name = "JSON", conflicts_with_all = ["data_file", "stdin"])]
     pub data: Option<String>,
 
-    /// Read JSON payload from a file
     #[arg(long = "data-file", value_name = "PATH", conflicts_with_all = ["data", "stdin"])]
     pub data_file: Option<PathBuf>,
 
-    /// Read JSON payload from standard input
     #[arg(long, conflicts_with_all = ["data", "data_file"])]
     pub stdin: bool,
 
-    /// Set any payload field as key=value; quote values to force JSON strings
     #[arg(long = "field", value_name = "key=value", action = clap::ArgAction::Append)]
     pub fields: Vec<String>,
 
-    /// Display or company name
     #[arg(long)]
     pub name: Option<String>,
 
-    /// Record number
     #[arg(long)]
     pub number: Option<String>,
 
-    /// Client hashed ID
     #[arg(long)]
     pub client_id: Option<String>,
 
-    /// Vendor hashed ID
     #[arg(long)]
     pub vendor_id: Option<String>,
 

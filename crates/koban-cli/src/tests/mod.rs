@@ -15,6 +15,7 @@ mod commands;
 mod invoice;
 mod payload;
 mod render;
+mod resource_parity;
 
 fn empty_payload_args() -> InvoicePayloadArgs {
     InvoicePayloadArgs {

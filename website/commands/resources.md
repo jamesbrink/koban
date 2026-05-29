@@ -1,8 +1,9 @@
 # Resource commands
 
-Every resource family shares the same verbs. The examples below use `clients`
-and `invoices`, but the shape is identical across resources (subject to the
-[inspect-only restrictions](/reference/resource-families)).
+Most resource families share the same verbs. The examples below use `clients`
+and `invoices`; a few official Invoice Ninja resources publish narrower route
+sets, and Koban rejects unsupported commands locally with an explicit message.
+See [Resource families](/reference/resource-families).
 
 ## Read
 
@@ -72,13 +73,18 @@ koban recurring-invoices action <id> --action start --dry-run
 ```
 
 Generic resource single-record actions are sent through Invoice Ninja's bulk
-action endpoint with a one-item `ids` list, matching the upstream API shape.
+action endpoint with a one-item `ids` list when that is the published upstream
+shape. Resources with official single-record action routes, such as quotes,
+payments, purchase orders, recurring invoices, and recurring quotes, use
+`GET /api/v1/{resource}/{id}/{action}`.
 
 ## Uploads
 
 ```sh
 koban invoices upload <id> --file contract.pdf --dry-run
 koban invoices upload <id> --file contract.pdf --yes
+koban quotes download <invitation_key> --output-file quote.pdf
+koban purchase-orders download <invitation_key> --output-file purchase-order.pdf
 ```
 
 ## Guardrails

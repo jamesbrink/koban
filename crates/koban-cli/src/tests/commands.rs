@@ -258,7 +258,7 @@ async fn expanded_resource_and_endpoint_dry_runs_do_not_touch_network() {
     .await
     .expect("purchase order update dry run");
     assert!(
-        update.contains("api/v1/purchase_orders/po_1"),
+        update.contains("api/v1/purchase_order/po_1"),
         "got: {update}"
     );
     assert!(update.contains("\"line_items\""), "got: {update}");
@@ -356,8 +356,8 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
     let upload = execute_with_config(
         Cli {
             output: OutputFormat::Json,
-            command: Some(Commands::Documents(ResourceCommand::Upload(UploadArgs {
-                id: "document_1".to_string(),
+            command: Some(Commands::Clients(ResourceCommand::Upload(UploadArgs {
+                id: "client_1".to_string(),
                 files: vec![upload_file],
                 safety: WriteSafetyArgs {
                     dry_run: true,
@@ -369,7 +369,7 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
         config.clone(),
     )
     .await
-    .expect("document upload dry run");
+    .expect("client upload dry run");
     assert!(upload.contains("\"method\": \"POST\""), "got: {upload}");
 
     let get_action = execute_with_config(
@@ -393,15 +393,11 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
     .await
     .expect("recurring invoice action dry run");
     assert!(
-        get_action.contains("\"method\": \"POST\""),
+        get_action.contains("\"method\": \"GET\""),
         "got: {get_action}"
     );
     assert!(
-        get_action.contains("api/v1/recurring_invoices/bulk"),
-        "got: {get_action}"
-    );
-    assert!(
-        get_action.contains("\"ids\": [\n      \"recurring_1\"\n    ]"),
+        get_action.contains("api/v1/recurring_invoices/recurring_1/start"),
         "got: {get_action}"
     );
 
@@ -434,7 +430,7 @@ async fn every_expanded_resource_has_reachable_dry_run_writes() {
         "got: {post_action}"
     );
     assert!(
-        post_action.contains("api/v1/clients/bulk"),
+        post_action.contains("api/v1/clients/client_1/updateTaxData"),
         "got: {post_action}"
     );
 }
@@ -1043,6 +1039,10 @@ fn expanded_resource_create_commands() -> Vec<(&'static str, Commands)> {
             Commands::RecurringExpenses(create_command()),
         ),
         (
+            "recurring quotes",
+            Commands::RecurringQuotes(create_command()),
+        ),
+        (
             "bank transactions",
             Commands::BankTransactions(create_command()),
         ),
@@ -1054,14 +1054,17 @@ fn expanded_resource_create_commands() -> Vec<(&'static str, Commands)> {
             "bank transaction rules",
             Commands::BankTransactionRules(create_command()),
         ),
+        ("group settings", Commands::GroupSettings(create_command())),
         (
             "expense categories",
             Commands::ExpenseCategories(create_command()),
         ),
-        ("tax rates", Commands::TaxRates(create_command())),
         ("payment terms", Commands::PaymentTerms(create_command())),
+        (
+            "task schedulers",
+            Commands::TaskSchedulers(create_command()),
+        ),
         ("task statuses", Commands::TaskStatuses(create_command())),
-        ("documents", Commands::Documents(create_command())),
         ("designs", Commands::Designs(create_command())),
         ("templates", Commands::Templates(create_command())),
         ("users", Commands::Users(create_command())),

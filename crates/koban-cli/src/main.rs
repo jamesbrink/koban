@@ -1,8 +1,11 @@
 mod cli;
 mod commands;
+mod endpoint_runner;
+mod file_paths;
 mod invoice;
 mod payload;
 mod render;
+mod resource_routes;
 mod update;
 
 use clap::{CommandFactory, Parser};
