@@ -29,6 +29,38 @@ async fn utility_defaults_to_safe_ping_get() {
 }
 
 #[tokio::test]
+async fn reports_default_to_post() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+    let output = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: None,
+                payload: {
+                    let mut args = empty_resource_payload_args();
+                    args.fields.push("date_range=last30".to_string());
+                    args
+                },
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect("report default dry run");
+    assert!(output.contains("\"method\": \"POST\""), "got: {output}");
+    assert!(
+        output.contains("\"path\": \"api/v1/reports\""),
+        "got: {output}"
+    );
+}
+
+#[tokio::test]
 async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
     let config = Config::from_values("http://localhost:1234", "token").expect("config");
 
