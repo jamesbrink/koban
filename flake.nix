@@ -145,6 +145,9 @@
               pkgs.git
               pkgs.gh
               pkgs.jq
+              # Docs site (VitePress, Tailwind v4, Vue 3) lives in ./website.
+              # prettier is a devDependency installed by `bun install`.
+              pkgs.bun
             ]
             ++ lib.optionals pkgs.stdenv.isDarwin [
               pkgs.libiconv
@@ -347,6 +350,36 @@
                 name = "smoke-all-demo";
                 help = "explicit demo-only smoke test for every implemented command family";
                 command = "./scripts/smoke-all-demo.sh \"$@\"";
+              }
+              {
+                category = "docs";
+                name = "docs-dev";
+                help = "start the VitePress dev server for the docs site";
+                command = "cd website && bun install && bun run dev \"$@\"";
+              }
+              {
+                category = "docs";
+                name = "docs-build";
+                help = "build the docs site (static output in website/.vitepress/dist)";
+                command = "cd website && bun install && bun run build";
+              }
+              {
+                category = "docs";
+                name = "docs-preview";
+                help = "preview the built documentation site";
+                command = "cd website && bun run preview \"$@\"";
+              }
+              {
+                category = "docs";
+                name = "docs-fmt";
+                help = "format documentation with prettier";
+                command = "cd website && bun run fmt";
+              }
+              {
+                category = "docs";
+                name = "docs-fmt-check";
+                help = "check documentation formatting (matches CI)";
+                command = "cd website && bun run fmt:check";
               }
             ];
           };

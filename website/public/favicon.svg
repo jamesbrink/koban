@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="koban-gold" x1="20" y1="8" x2="44" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E8C766"/>
+      <stop offset="0.5" stop-color="#D4AF37"/>
+      <stop offset="1" stop-color="#8A6D1F"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1A1814"/>
+  <rect x="4" y="4" width="56" height="56" rx="14" stroke="#D4AF37" stroke-width="2"/>
+  <!-- The koban: an oval gold coin, tilted as it would lie on a table. -->
+  <ellipse cx="32" cy="32" rx="14" ry="21" transform="rotate(-20 32 32)" fill="url(#koban-gold)" stroke="#6E5618" stroke-width="1.5"/>
+  <!-- Stamped seal marks engraved down the face of the coin. -->
+  <g transform="rotate(-20 32 32)" stroke="#6E5618" stroke-width="2" stroke-linecap="round">
+    <line x1="32" y1="18" x2="32" y2="26"/>
+    <line x1="28" y1="31" x2="36" y2="31"/>
+    <line x1="32" y1="35" x2="32" y2="46"/>
+  </g>
+</svg>

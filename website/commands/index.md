@@ -1,0 +1,67 @@
+# Commands overview
+
+The implemented `koban` API surface is intentionally boring and durable. Most
+work flows through one repeating command shape, plus a handful of special cases
+for invoices and endpoint runners.
+
+## The durable command shape
+
+```text
+koban statics
+koban <resource> list
+koban <resource> show <id>
+koban <resource> template
+koban <resource> edit-template <id>
+koban <resource> create
+koban <resource> update <id>
+koban <resource> delete <id>
+koban <resource> bulk
+koban <resource> action <id>
+koban <resource> upload <id>
+koban invoices download <invitation_key>
+koban invoices delivery-note <id>
+koban search run
+koban reports run
+koban charts run
+koban utility run
+```
+
+See [Resource commands](/commands/resources) for the shared verbs,
+[Invoices](/commands/invoices) for the invoice-specific extras, and
+[Endpoint runners](/commands/endpoints) for `reports` / `charts` / `search` /
+`utility`.
+
+## Global flags
+
+| Flag       | Values          | Default | Purpose                       |
+| ---------- | --------------- | ------- | ----------------------------- |
+| `--output` | `table`, `json` | `table` | Human tables vs. stable JSON. |
+
+## Resource families
+
+`<resource>` includes:
+
+`clients`, `invoices`, `payments`, `quotes`, `credits`, `vendors`, `expenses`,
+`projects`, `tasks`, `locations`, `products`, `recurring-invoices`,
+`purchase-orders`, `recurring-expenses`, `bank-transactions`,
+`bank-integrations`, `bank-transaction-rules`, `expense-categories`,
+`tax-rates`, `payment-terms`, `task-statuses`, `activities`, `system-logs`,
+`documents`, `designs`, `templates`, `users`, `companies`, `company-gateways`,
+`company-ledger`, `company-users`, `tokens`, `webhooks`, `imports`,
+`subscriptions`, and `client-gateway-tokens`.
+
+Inspect-only/high-risk groups — `activities`, `system-logs`, `company-ledger`,
+and `imports` — expose only `list` and `show`. See the full breakdown in the
+[Resource families reference](/reference/resource-families).
+
+## Other commands
+
+```sh
+koban --version
+koban --help
+koban update --check
+koban completions zsh
+```
+
+- [`koban update`](/guide/updating) — self-update from GitHub releases.
+- [`koban completions`](/guide/completions) — shell completion scripts.

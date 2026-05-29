@@ -50,10 +50,16 @@ write commands:
 The Nix devshell intentionally exposes the project helper menu. Keep these
 helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `build-release`, `check`, `clippy`, `fmt`, `fmt-check`, `run-tests`, `ci-local`,
-`coverage`, `code-health`, `koban`, `koban-help`, `smoke-statics`, and
-`smoke-invoice-write-demo`, and `smoke-all-demo`.
+`coverage`, `code-health`, `koban`, `koban-help`, `smoke-statics`,
+`smoke-invoice-write-demo`, `smoke-all-demo`, `docs-dev`, `docs-build`,
+`docs-preview`, `docs-fmt`, and `docs-fmt-check`.
 The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
 the gitignored `.env` file when those variables are not already set.
+
+The documentation website lives in `website/` (VitePress + Tailwind v4 + Vue 3,
+built with `bun`) and deploys to GitHub Pages via `.github/workflows/pages.yml`.
+Keep the `docs-*` devshell helpers, README, and `website/package.json` scripts in
+sync. Docs-only changes are excluded from the nightly build via `paths-ignore`.
 Mutating smoke helpers must hard-code the public demo API internally so they
 cannot inherit a production or personal endpoint.
 
