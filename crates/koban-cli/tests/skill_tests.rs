@@ -42,6 +42,32 @@ fn generate_all_emits_claude_codex_and_agents_with_correct_frontmatter() {
 }
 
 #[test]
+fn skill_documents_filter_traps_and_status_codes() {
+    let dir = tempdir().expect("tempdir");
+    koban()
+        .args(["skill", "generate", "--target", "all", "--dir"])
+        .arg(dir.path())
+        .assert()
+        .success();
+
+    let claude =
+        std::fs::read_to_string(dir.path().join(".claude/skills/koban/SKILL.md")).expect("claude");
+    // The silent-ignore filter trap and the canonical outstanding recipe.
+    assert!(claude.contains("silently ignored"));
+    assert!(claude.contains("client_status=unpaid"));
+    // The status_id mapping that statics does not provide.
+    assert!(claude.contains("status_id"));
+    assert!(claude.contains("4         | paid"));
+    // Reporting runners are accurately documented as POST/confirmation-gated.
+    assert!(claude.contains("treated as mutations"));
+
+    // The compact AGENTS.md block carries the same filter warning.
+    let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).expect("agents");
+    assert!(agents.contains("client_status=unpaid"));
+    assert!(agents.contains("silently ignored"));
+}
+
+#[test]
 fn generate_optional_targets_emit_their_own_formats() {
     let dir = tempdir().expect("tempdir");
     koban()

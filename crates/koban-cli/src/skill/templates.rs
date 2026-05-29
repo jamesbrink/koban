@@ -103,6 +103,46 @@ confirmation gate:
 
 Always run `--dry-run` first, inspect the request, then re-run with `--yes`.
 
+Read-only (no confirmation needed): `list`, `show`, `template`, `edit-template`,
+`statics`, `auth status`, and `utility run --endpoint ping|health_check`.
+
+## Filtering lists
+
+`--filter key=value` is passed straight to Invoice Ninja. **Unknown filter keys
+and unknown values are silently ignored and return the full, unfiltered set** —
+always sanity-check the row count against an unfiltered `list`.
+
+- Outstanding invoices: use `--filter client_status=unpaid` (add `overdue`),
+  **not** `outstanding`, which is silently ignored and returns everything. Valid
+  invoice values: `all`, `draft`, `paid`, `unpaid`, `overdue`.
+- "Outstanding balance" means `balance > 0`; confirm by summing
+  `[.data[].balance]` with `jq`.
+
+## Status codes
+
+List rows carry a numeric `status_id` that is **not** in `statics`. For invoices:
+
+| status_id | meaning   |
+| --------- | --------- |
+| 1         | draft     |
+| 2         | sent      |
+| 3         | partial   |
+| 4         | paid      |
+| 5         | cancelled |
+| 6         | reversed  |
+
+Quotes, purchase orders, and other documents use their own `status_id` codes
+(quotes also carry virtual negative statuses), so verify those against your data.
+
+## Reporting runners need confirmation
+
+`search`, `reports`, and `charts` POST to Invoice Ninja (e.g. `search` →
+`POST /api/v1/search`, `reports run --endpoint reports/invoices`), so they are
+treated as mutations: preview with `--dry-run`, then run with `--yes`. A purely
+read-only workflow can preview but not execute them. Custom `--endpoint`
+overrides outside `reports/` and `charts/` (and custom `utility run` paths) are
+restricted to `GET` for safety.
+
 ## Commands
 
 {command_list}
@@ -159,6 +199,11 @@ on outstanding balances as you go, so the books stay in sync.
 - **JSON for agents:** add `--output json` to any command.
 - **Safety:** mutating commands require a gate — preview with `--dry-run`, then
   confirm with `--yes`. Always dry-run first.
+- **Filters:** `--filter key=value` is forwarded raw; unknown keys/values are
+  silently ignored and return everything, so verify the row count. Outstanding
+  invoices = `--filter client_status=unpaid` (not `outstanding`); list rows use
+  `status_id` (invoices: 1 draft, 2 sent, 3 partial, 4 paid, 5 cancelled,
+  6 reversed), which is not in `statics`.
 
 Commands:
 
