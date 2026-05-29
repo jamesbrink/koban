@@ -1058,7 +1058,7 @@ fn invoice_payload_validation_is_actionable_without_network() {
         ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("invoice payload is not valid"))
+        .stderr(predicate::str::contains("payload is not valid"))
         .stderr(predicate::str::contains(
             "raw JSON input cannot be combined",
         ));

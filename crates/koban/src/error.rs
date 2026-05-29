@@ -55,6 +55,12 @@ pub enum KobanError {
     Transport { message: String },
 
     #[error("Invoice Ninja returned HTTP {status} for {endpoint}: {message}")]
+    #[cfg_attr(
+        feature = "miette",
+        diagnostic(help(
+            "401/403 usually means the API token lacks permission for this resource or company; 404 often means the record or route does not exist."
+        ))
+    )]
     Api {
         status: u16,
         endpoint: String,
@@ -71,7 +77,7 @@ pub enum KobanError {
     )]
     InvalidFilter { value: String },
 
-    #[error("invoice payload is not valid: {message}")]
+    #[error("payload is not valid: {message}")]
     #[cfg_attr(
         feature = "miette",
         diagnostic(help(
@@ -79,6 +85,15 @@ pub enum KobanError {
         ))
     )]
     InvalidPayload { message: String },
+
+    #[error("request is not valid: {message}")]
+    #[cfg_attr(
+        feature = "miette",
+        diagnostic(help(
+            "Check the command's flags and endpoint. Endpoint runners accept payload fields only on POST/PUT, and custom --endpoint overrides outside reports/ and charts/ are read-only (use --method get)."
+        ))
+    )]
+    InvalidRequest { message: String },
 
     #[error("confirmation required for {operation}")]
     #[cfg_attr(
