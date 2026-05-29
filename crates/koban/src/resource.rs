@@ -36,7 +36,6 @@ pub enum Resource {
     CompanyUsers,
     Tokens,
     Webhooks,
-    Imports,
     Subscriptions,
     ClientGatewayTokens,
 }
@@ -80,7 +79,6 @@ impl Resource {
             Self::CompanyUsers => "company_users",
             Self::Tokens => "tokens",
             Self::Webhooks => "webhooks",
-            Self::Imports => "imports",
             Self::Subscriptions => "subscriptions",
             Self::ClientGatewayTokens => "client_gateway_tokens",
         }

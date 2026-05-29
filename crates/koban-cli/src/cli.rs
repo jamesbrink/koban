@@ -217,10 +217,6 @@ Examples:
     #[command(subcommand)]
     Webhooks(ResourceCommand),
 
-    /// List and inspect imports
-    #[command(subcommand)]
-    Imports(InspectResourceCommand),
-
     /// List, show, and manage subscriptions
     #[command(subcommand)]
     Subscriptions(ResourceCommand),

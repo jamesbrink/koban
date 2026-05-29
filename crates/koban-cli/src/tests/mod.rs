@@ -12,6 +12,7 @@ use crate::{cli::*, commands::*, invoice::*, payload::*, render::*};
 
 mod cli;
 mod commands;
+mod endpoints;
 mod invoice;
 mod payload;
 mod render;

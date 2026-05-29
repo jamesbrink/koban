@@ -117,7 +117,6 @@ fn resource_supports(resource: Resource, capability: ResourceCapability) -> bool
                 | Resource::CompanyLedger
                 | Resource::CompanyUsers
                 | Resource::Documents
-                | Resource::Imports
                 | Resource::Templates
         ),
         ResourceCapability::Template => !matches!(
@@ -126,7 +125,6 @@ fn resource_supports(resource: Resource, capability: ResourceCapability) -> bool
                 | Resource::CompanyLedger
                 | Resource::CompanyUsers
                 | Resource::Documents
-                | Resource::Imports
                 | Resource::TaxRates
                 | Resource::Templates
         ),
@@ -136,7 +134,6 @@ fn resource_supports(resource: Resource, capability: ResourceCapability) -> bool
                 | Resource::CompanyLedger
                 | Resource::CompanyUsers
                 | Resource::Documents
-                | Resource::Imports
                 | Resource::Locations
                 | Resource::TaskSchedulers
                 | Resource::Templates
@@ -146,7 +143,6 @@ fn resource_supports(resource: Resource, capability: ResourceCapability) -> bool
             Resource::Activities
                 | Resource::CompanyLedger
                 | Resource::Documents
-                | Resource::Imports
                 | Resource::TaxRates
         ),
         ResourceCapability::Update | ResourceCapability::Delete => !matches!(
@@ -155,7 +151,6 @@ fn resource_supports(resource: Resource, capability: ResourceCapability) -> bool
                 | Resource::CompanyLedger
                 | Resource::CompanyUsers
                 | Resource::Documents
-                | Resource::Imports
                 | Resource::Templates
         ),
         ResourceCapability::Bulk => !matches!(
@@ -166,7 +161,6 @@ fn resource_supports(resource: Resource, capability: ResourceCapability) -> bool
                 | Resource::CompanyLedger
                 | Resource::CompanyUsers
                 | Resource::Documents
-                | Resource::Imports
                 | Resource::Locations
                 | Resource::Templates
         ),

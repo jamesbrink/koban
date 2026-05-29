@@ -160,9 +160,6 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
         Some(Commands::Webhooks(command)) => {
             execute_resource(&client, output, Resource::Webhooks, command).await
         }
-        Some(Commands::Imports(command)) => {
-            execute_inspect_resource(&client, output, Resource::Imports, command).await
-        }
         Some(Commands::Subscriptions(command)) => {
             execute_resource(&client, output, Resource::Subscriptions, command).await
         }

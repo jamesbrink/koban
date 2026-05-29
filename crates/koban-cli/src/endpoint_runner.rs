@@ -35,7 +35,10 @@ async fn execute_endpoint_run(
     let method = args
         .method
         .unwrap_or_else(|| default_method(default_endpoint));
-    if (default_endpoint == "ping" || custom_endpoint) && !matches!(method, HttpMethod::Get) {
+    if custom_endpoint
+        && !is_scoped_query_endpoint(default_endpoint, &endpoint)
+        && !matches!(method, HttpMethod::Get)
+    {
         return Err(KobanError::InvalidPayload {
             message: "custom and utility endpoint runners are read-only; use --method get"
                 .to_string(),
@@ -87,6 +90,16 @@ fn default_method(default_endpoint: &str) -> HttpMethod {
     } else {
         HttpMethod::Post
     }
+}
+
+fn is_scoped_query_endpoint(default_endpoint: &str, endpoint: &str) -> bool {
+    matches!(
+        (default_endpoint, endpoint),
+        ("reports", endpoint) if endpoint.starts_with("reports/")
+    ) || matches!(
+        (default_endpoint, endpoint),
+        ("charts", endpoint) if endpoint.starts_with("charts/")
+    )
 }
 
 fn validate_endpoint_path(path: &str) -> Result<()> {

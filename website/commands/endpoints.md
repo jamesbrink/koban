@@ -22,12 +22,16 @@ Endpoint runner payload flags are accepted only for `POST` and `PUT` requests.
 live request would silently ignore.
 
 Search, report, and chart endpoint runners default to `POST` when the endpoint
-is not overridden. Utility and custom endpoint overrides are read-only.
+is not overridden. Report overrides under `reports/...` and chart overrides
+under `charts/...` may use payload methods because those are the concrete
+official grouped endpoints. Utility and other custom endpoint overrides are
+read-only.
 
 ## Custom endpoint overrides are read-only
 
-Custom `--endpoint` overrides only send `GET` requests. This keeps the escape
-hatch safe: use the first-class resource commands for any mutation.
+Custom `--endpoint` overrides outside the report/chart grouped endpoint
+families only send `GET` requests. This keeps the escape hatch safe: use the
+first-class resource commands for any mutation.
 
 ```sh
 # A custom override is GET-only.
