@@ -9,8 +9,10 @@ on:
       - ".github/instructions/**"
       - ".github/workflows/ci.yml"
       - ".github/workflows/release-please.yml"
+      - ".github/workflows/pages.yml"
       - ".release-please-manifest.json"
       - "CHANGELOG.md"
+      - "website/**"
   workflow_dispatch: {}
 
 concurrency:

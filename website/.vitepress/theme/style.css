@@ -1,0 +1,255 @@
+@import 'tailwindcss';
+
+/*
+ * koban — "gold on lacquer black"
+ *
+ * The koban was the Edo-period oval gold coin ninja were paid in. The palette
+ * is metallic gold on warm lacquer ink by night, gold on washi cream by day.
+ *   gold       #D4AF37   (koban metal — brand)
+ *   gold-soft  #E8C766
+ *   gold-deep  #8A6D1F
+ *   gold-ink   #6E5618
+ *   cream      #F5F1E6   (washi paper)
+ *   ink        #1A1814   (warm lacquer near-black)
+ *   char       #100E0B   (deeper ink)
+ *   stone      #585048   (muted text)
+ */
+
+:root {
+  --koban-gold: #d4af37;
+  --koban-gold-soft: #e8c766;
+  --koban-gold-deep: #8a6d1f;
+  --koban-gold-ink: #6e5618;
+  --koban-cream: #f5f1e6;
+  --koban-cream-soft: #faf7ee;
+  --koban-ink: #1a1814;
+  --koban-char: #100e0b;
+  --koban-stone: #585048;
+
+  /* VitePress brand tokens */
+  --vp-c-brand-1: #8a6d1f;
+  --vp-c-brand-2: #b8902a;
+  --vp-c-brand-3: #6e5618;
+  --vp-c-brand-soft: rgba(212, 175, 55, 0.14);
+
+  /* Warm surfaces */
+  --vp-c-bg: #fcfaf4;
+  --vp-c-bg-alt: var(--koban-cream);
+  --vp-c-bg-soft: #f5f1e6;
+  --vp-c-bg-elv: #ffffff;
+
+  /* Hero name — solid gold (no gradient text). */
+  --vp-home-hero-name-color: #8a6d1f;
+  --vp-home-hero-name-background: transparent;
+  --vp-home-hero-image-background-image:
+    radial-gradient(
+      circle at 30% 30%,
+      rgba(212, 175, 55, 0.3) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 70% 70%,
+      rgba(138, 109, 31, 0.24) 0%,
+      transparent 60%
+    );
+  --vp-home-hero-image-filter: blur(52px);
+
+  /* Buttons */
+  --vp-button-brand-border: var(--koban-gold-deep);
+  --vp-button-brand-text: #1a120e;
+  --vp-button-brand-bg: var(--koban-gold);
+  --vp-button-brand-hover-border: var(--koban-gold);
+  --vp-button-brand-hover-text: #1a120e;
+  --vp-button-brand-hover-bg: var(--koban-gold-soft);
+  --vp-button-brand-active-border: var(--koban-gold-ink);
+  --vp-button-brand-active-text: #1a120e;
+  --vp-button-brand-active-bg: var(--koban-gold-deep);
+
+  /* Code */
+  --vp-code-block-bg: #faf7ef;
+  --vp-code-line-highlight-color: rgba(212, 175, 55, 0.1);
+}
+
+.dark {
+  --vp-c-brand-1: #e8c766;
+  --vp-c-brand-2: #d4af37;
+  --vp-c-brand-3: #b8902a;
+  --vp-c-brand-soft: rgba(232, 199, 102, 0.14);
+
+  /* Brighter solid gold on lacquer. */
+  --vp-home-hero-name-color: #d4af37;
+
+  --vp-c-bg: var(--koban-char);
+  --vp-c-bg-alt: var(--koban-ink);
+  --vp-c-bg-soft: #1f1c16;
+  --vp-c-bg-elv: #231f18;
+
+  --vp-button-brand-text: #16130d;
+  --vp-button-brand-bg: var(--koban-gold);
+  --vp-button-brand-border: var(--koban-gold);
+  --vp-button-brand-hover-text: #16130d;
+  --vp-button-brand-hover-bg: var(--koban-gold-soft);
+  --vp-button-brand-hover-border: var(--koban-gold-soft);
+
+  --vp-code-block-bg: #181410;
+}
+
+/* Inline code — warm gold tint */
+:root {
+  --vp-c-text-code: var(--koban-gold-ink);
+}
+.dark {
+  --vp-c-text-code: var(--koban-gold-soft);
+}
+
+/* Left-bar accent on code blocks — a signature mark, like a coin's edge */
+.vp-doc div[class*='language-'] {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--koban-gold) 16%, transparent);
+}
+
+.vp-doc div[class*='language-']::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--koban-gold-soft) 0%,
+    var(--koban-gold-deep) 100%
+  );
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Code group tabs */
+.vp-code-group .tabs {
+  border-radius: 10px 10px 0 0;
+  border: 1px solid color-mix(in srgb, var(--koban-gold) 16%, transparent);
+  background: color-mix(in srgb, var(--koban-gold) 5%, var(--vp-c-bg-soft));
+}
+
+.vp-code-group .tabs input:checked + label {
+  color: #16130d;
+  background: var(--koban-gold);
+}
+
+/* Feature cards */
+.VPFeature {
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--koban-gold) 20%, transparent);
+  background: color-mix(in srgb, var(--koban-gold) 3%, var(--vp-c-bg-soft));
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--koban-gold) 48%, transparent);
+  box-shadow: 0 14px 28px rgba(26, 24, 20, 0.1);
+}
+
+.dark .VPFeature:hover {
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.5);
+}
+
+.VPFeature .icon {
+  background: color-mix(in srgb, var(--koban-gold) 16%, transparent);
+  border-radius: 10px;
+}
+
+/* Nav / sidebar — warmer text on hover/active */
+.VPSidebarItem.is-active > .item .link .text,
+.VPNavBarMenuLink.active,
+.VPNavBarMenuLink:hover {
+  color: var(--vp-c-brand-1);
+}
+
+/* Links — gold underline, thickens on hover */
+.vp-doc a {
+  text-decoration-color: color-mix(in srgb, var(--koban-gold) 55%, transparent);
+  text-underline-offset: 2px;
+}
+
+.vp-doc a:hover {
+  text-decoration-color: var(--koban-gold);
+}
+
+/* Tables */
+.vp-doc table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+.vp-doc table th {
+  background: color-mix(in srgb, var(--koban-gold) 10%, var(--vp-c-bg-soft));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.vp-doc table tr:nth-child(2n) {
+  background: color-mix(in srgb, var(--koban-gold) 4%, transparent);
+}
+
+/* Custom blocks — retint tip to the gold palette */
+.vp-doc .custom-block.tip {
+  border-color: var(--koban-gold);
+  background: color-mix(in srgb, var(--koban-gold) 8%, transparent);
+}
+
+.vp-doc .custom-block.tip .custom-block-title {
+  color: var(--koban-gold-ink);
+}
+
+.dark .vp-doc .custom-block.tip .custom-block-title {
+  color: var(--koban-gold-soft);
+}
+
+/* Hero polish */
+.VPHero .name {
+  letter-spacing: -0.02em;
+}
+
+.VPHero .tagline {
+  color: var(--koban-stone);
+}
+
+.dark .VPHero .tagline {
+  color: #c9bfb0;
+}
+
+/* Footer */
+.VPFooter {
+  border-top-color: color-mix(in srgb, var(--koban-gold) 22%, transparent);
+}
+
+/* Utility: terminal blocks */
+.terminal {
+  display: block;
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--koban-gold) 30%, transparent);
+  background: var(--koban-char);
+  color: #f5f1e6;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.9em;
+  line-height: 1.55;
+  overflow-x: auto;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 10px 24px rgba(16, 14, 11, 0.2);
+}
+
+.terminal .prompt {
+  color: var(--koban-gold);
+}
+
+.terminal .comment {
+  color: #8a8278;
+}

@@ -1,9 +1,22 @@
 # koban
 
+[![CI](https://github.com/jamesbrink/koban/actions/workflows/ci.yml/badge.svg)](https://github.com/jamesbrink/koban/actions/workflows/ci.yml)
+[![koban on crates.io](https://img.shields.io/crates/v/koban.svg?label=koban)](https://crates.io/crates/koban)
+[![koban-cli on crates.io](https://img.shields.io/crates/v/koban-cli.svg?label=koban-cli)](https://crates.io/crates/koban-cli)
+[![docs.rs](https://img.shields.io/docsrs/koban?label=docs.rs)](https://docs.rs/koban)
+[![Docs](https://img.shields.io/badge/docs-website-D4AF37)](https://jamesbrink.github.io/koban/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 `koban` is an early-stage Rust CLI for [Invoice Ninja](https://www.invoiceninja.com/).
 The goal is a small, scriptable tool that feels good for humans at a terminal
 and predictable for AI agents that need stable JSON output, explicit errors, and
 shell completions.
+
+The name is a nod to the _koban_ (小判), the Edo-period oval gold coin ninja were
+paid in — a short, currency-flavored name for a tool that drives an invoicing
+API.
+
+📖 **Documentation: <https://jamesbrink.github.io/koban/>**
 
 The project is a Cargo workspace with two crates:
 
@@ -326,7 +339,16 @@ koban-help      show koban help
 smoke-statics   safe live GET /api/v1/statics smoke test
 smoke-invoice-write-demo  explicit demo-only invoice create/update/delete smoke test
 smoke-all-demo  explicit demo-only smoke test for every implemented command family
+docs-dev        start the VitePress dev server for the docs site
+docs-build      build the docs site (static output in website/.vitepress/dist)
+docs-preview    preview the built documentation site
+docs-fmt        format documentation with prettier
+docs-fmt-check  check documentation formatting (matches CI)
 ```
+
+The documentation website lives in `website/` (VitePress) and is published to
+GitHub Pages at <https://jamesbrink.github.io/koban/> by
+`.github/workflows/pages.yml` on pushes to `main` that touch `website/`.
 
 The devshell also loads `INVOICE_NINJA_API_TOKEN` and
 `INVOICE_NINJA_BASE_URL` from a local gitignored `.env` file when those

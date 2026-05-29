@@ -21,3 +21,8 @@ tmp/
 *.profdata
 lcov.info
 target/coverage/
+
+# Docs site (VitePress) — bun.lock is committed
+website/node_modules/
+website/.vitepress/dist/
+website/.vitepress/cache/
