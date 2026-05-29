@@ -40,14 +40,24 @@ curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | 
 Installer options:
 
 ```sh
+# A specific release tag, into a custom directory
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | \
   KOBAN_VERSION="v0.1.0" KOBAN_INSTALL_DIR="$HOME/.local/bin" sh
+
+# The rolling nightly build from main (before the first stable release)
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | \
+  KOBAN_VERSION="nightly" sh
 ```
+
+`KOBAN_VERSION` accepts `latest` (default, newest stable release), `nightly`
+(the rolling prerelease built from `main`), or a tag such as `v0.1.0`. Pass
+`--help` to the script (`sh install.sh --help`) to print usage.
 
 The installer downloads GitHub release tarballs, verifies `SHA256SUMS` when
 available, installs `koban` into `~/.local/bin` by default, and prints the
 installed version. It uses the same macOS/Linux asset names as release CI and
-`koban update`.
+`koban update`. Until the first stable release is tagged, `latest` will 404 and
+the installer points you at the `nightly` build.
 
 Other install paths:
 
