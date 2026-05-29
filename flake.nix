@@ -202,6 +202,20 @@
                   koban_load_dotenv_var INVOICE_NINJA_BASE_URL
                   unset -f koban_load_dotenv_var
                 fi
+
+                # Pin koban to the public Invoice Ninja demo endpoint in this
+                # repo. An agent (Claude Code, Codex, ...) that loads the koban
+                # skill here must never reach a production or personal account:
+                # default the demo credentials when unset, and isolate
+                # KOBAN_CONFIG_DIR to a gitignored repo-local directory so a
+                # stored `koban auth login` credential at the platform config
+                # dir is never resolved in this shell. For an intentional
+                # real-account read, export INVOICE_NINJA_* yourself (env always
+                # wins) or point KOBAN_CONFIG_DIR at your real config.
+                : "''${INVOICE_NINJA_BASE_URL:=https://demo.invoiceninja.com}"
+                : "''${INVOICE_NINJA_API_TOKEN:=TOKEN}"
+                : "''${KOBAN_CONFIG_DIR:=''${PRJ_ROOT:-$PWD}/.koban}"
+                export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN KOBAN_CONFIG_DIR
               '';
             };
 

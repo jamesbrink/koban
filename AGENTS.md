@@ -40,6 +40,12 @@ write commands:
   merges, scheduler, support, or admin utility routes unless the smoke helper is
   demo-only, opt-in, and creates/cleans up its own fixtures.
 - Use production or personal accounts only for intentional checks.
+- Agents (Claude Code, Codex, etc.) that load the koban skill **while working in
+  this repo** must run koban only against the public demo endpoint. The devshell
+  defaults the demo credentials and pins `KOBAN_CONFIG_DIR` to a gitignored
+  repo-local `.koban/`, so a stored `koban auth login` credential is never
+  resolved here. Do not point koban at a production or personal account unless
+  the human explicitly asks for an intentional, read-only check.
 - Keep token handling environment-first with `INVOICE_NINJA_API_TOKEN` and
   optional `INVOICE_NINJA_BASE_URL`. `koban auth login` may also persist a token,
   but env vars always win. Credential resolution lives in `koban-cli`'s
@@ -63,7 +69,12 @@ helpers in sync with README.md and CI when editing `flake.nix`: `build`,
 `smoke-invoice-write-demo`, `smoke-all-demo`, `docs-dev`, `docs-build`,
 `docs-preview`, `docs-fmt`, and `docs-fmt-check`.
 The devshell loads `INVOICE_NINJA_API_TOKEN` and `INVOICE_NINJA_BASE_URL` from
-the gitignored `.env` file when those variables are not already set.
+the gitignored `.env` file when those variables are not already set, then
+defaults them to the public demo (`https://demo.invoiceninja.com` / `TOKEN`) and
+pins `KOBAN_CONFIG_DIR` to a gitignored repo-local `.koban/` so a stored
+production credential is never resolved in the devshell. Override deliberately
+(`export INVOICE_NINJA_*` or `KOBAN_CONFIG_DIR`) for an intentional real-account
+check.
 
 The documentation website lives in `website/` (VitePress + Tailwind v4 + Vue 3,
 built with `bun`) and deploys to GitHub Pages via `.github/workflows/pages.yml`.

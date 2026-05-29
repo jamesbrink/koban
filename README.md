@@ -420,6 +420,14 @@ INVOICE_NINJA_API_TOKEN=TOKEN
 INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com
 ```
 
+To keep this repo safe for AI agents, the devshell then **pins koban to the
+public demo endpoint**: it defaults the two variables above to the demo when
+unset and points `KOBAN_CONFIG_DIR` at a gitignored repo-local `.koban/`, so a
+stored `koban auth login` credential is never resolved in the devshell. An agent
+loading the koban skill here can only reach the demo account. For an intentional
+real-account read, export `INVOICE_NINJA_*` yourself (env always wins) or point
+`KOBAN_CONFIG_DIR` at your real config.
+
 The demo write smoke helpers are intentionally opt-in and hard-code the public
 demo API internally so they cannot inherit a production or personal endpoint:
 

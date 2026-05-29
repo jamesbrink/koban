@@ -7,6 +7,9 @@
 .direnv/
 .DS_Store
 .env
+# Repo-local koban config dir the devshell pins KOBAN_CONFIG_DIR to, so the
+# stored production credential is never resolved here.
+.koban/
 .idea/
 .vscode/
 *.swo
