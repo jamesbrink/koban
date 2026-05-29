@@ -523,6 +523,9 @@ async fn execute_list(
     args: ListArgs,
 ) -> Result<String> {
     require_resource_capability(resource, ResourceCapability::List)?;
+    if let Some(warning) = unrecognized_client_status_warning(resource, &args.filters) {
+        eprintln!("{warning}");
+    }
     let mut base_query = Vec::new();
     push_include(&mut base_query, args.include);
     push_sort(&mut base_query, args.sort);
@@ -802,6 +805,45 @@ pub(crate) fn push_sort(query: &mut Vec<(String, String)>, sort: Option<String>)
     {
         query.push(("sort".to_string(), sort));
     }
+}
+
+/// Invoice Ninja silently ignores unknown `client_status` filter values and
+/// returns the full, unfiltered set — a correctness trap (e.g. `outstanding`
+/// looks like a filter but returns every invoice). Return a warning for any
+/// unrecognized value so the caller can surface it on stderr without failing.
+/// Scoped to invoices, whose `client_status` enum is stable and documented;
+/// other resources use different values we do not validate here.
+pub(crate) fn unrecognized_client_status_warning(
+    resource: Resource,
+    filters: &[String],
+) -> Option<String> {
+    if resource != Resource::Invoices {
+        return None;
+    }
+    const VALID: [&str; 5] = ["all", "draft", "paid", "unpaid", "overdue"];
+    let mut unknown = Vec::new();
+    for filter in filters {
+        let Some((key, value)) = filter.split_once('=') else {
+            continue;
+        };
+        if key.trim() != "client_status" {
+            continue;
+        }
+        for candidate in value.split(',').map(str::trim).filter(|v| !v.is_empty()) {
+            if !VALID.contains(&candidate) && !unknown.iter().any(|v| v == candidate) {
+                unknown.push(candidate.to_string());
+            }
+        }
+    }
+    if unknown.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "warning: --filter client_status={} is not a recognized invoice status (use one of: {}); \
+         Invoice Ninja silently ignores unknown values and returns all rows.",
+        unknown.join(","),
+        VALID.join(", "),
+    ))
 }
 
 pub(crate) fn push_filters(query: &mut Vec<(String, String)>, filters: Vec<String>) -> Result<()> {
