@@ -298,6 +298,21 @@ fn relogin_without_base_url_verifies_against_and_keeps_the_stored_host() {
     assert!(contents.contains("tok-second"));
 }
 
+#[test]
+fn corrupt_config_surfaces_an_error_instead_of_silent_default() {
+    // Regression: a malformed config.json must produce a clear error, not be
+    // silently treated as "no credentials".
+    let dir = tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("config.json"), "{ not valid json").expect("seed");
+
+    koban()
+        .env("KOBAN_CONFIG_DIR", dir.path())
+        .args(["auth", "status"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("could not parse"));
+}
+
 fn json_empty() -> serde_json::Value {
     serde_json::json!({ "data": [] })
 }

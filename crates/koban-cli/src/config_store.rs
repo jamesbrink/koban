@@ -194,7 +194,9 @@ pub(crate) fn save(base_url: Option<String>, token: &str, use_keychain: bool) ->
 /// default) base URL — never a stored one — matching the previous
 /// `Config::from_env` behavior and keeping env-driven runs self-contained.
 pub(crate) fn resolve() -> Result<(String, String)> {
-    let stored = load_file().unwrap_or_default();
+    // Propagate read/parse errors: a corrupt config should surface a clear
+    // error, not silently fall back to defaults and report a missing token.
+    let stored = load_file()?;
 
     if let Some(token) = env_non_empty(API_TOKEN_ENV) {
         return Ok((resolve_base_url(TokenSource::Env, &stored), token));
@@ -243,12 +245,18 @@ pub(crate) fn stored_base_url() -> Result<Option<String>> {
 
 /// Report the active credential source without exposing the token.
 pub(crate) fn status() -> Result<AuthStatus> {
-    let stored = load_file().unwrap_or_default();
+    let stored = load_file()?;
 
     let source = if env_non_empty(API_TOKEN_ENV).is_some() {
         TokenSource::Env
-    } else if stored.keychain && keychain_get().ok().flatten().is_some() {
-        TokenSource::Keychain
+    } else if stored.keychain {
+        // The config points at the keychain: surface a locked/unreachable
+        // backend instead of masking it as "not authenticated".
+        if keychain_get()?.is_some() {
+            TokenSource::Keychain
+        } else {
+            TokenSource::None
+        }
     } else if stored
         .api_token
         .as_ref()
@@ -271,7 +279,9 @@ pub(crate) fn status() -> Result<AuthStatus> {
 /// Remove any stored credential (file token + keychain entry). Returns whether
 /// something was actually removed. A stored `base_url` is preserved.
 pub(crate) fn clear() -> Result<bool> {
-    let mut removed = keychain_delete().unwrap_or(false);
+    // Surface keychain failures: if a secret exists but the backend is locked or
+    // unreachable, logout must error rather than orphan the stored credential.
+    let mut removed = keychain_delete()?;
 
     let path = config_path()?;
     if path.exists() {

@@ -26,13 +26,17 @@ current project by default, or your user-level config with `--global`.
 | Target           | Output                                | Covers                                              |
 | ---------------- | ------------------------------------- | --------------------------------------------------- |
 | `claude-code`    | `.claude/skills/koban/SKILL.md`       | Claude Code                                         |
-| `codex`          | `.agents/skills/koban/SKILL.md`       | OpenAI Codex CLI (and pi)                           |
-| `pi`             | `.pi/skills/koban/SKILL.md`           | pi coding agent                                     |
+| `codex`          | `.agents/skills/koban/SKILL.md`       | OpenAI Codex CLI                                    |
+| `pi`             | `.pi/skills/koban/SKILL.md`           | pi coding agent (native location)                   |
 | `agents-md`      | `AGENTS.md` block                     | Cursor, Windsurf, Gemini CLI, Aider, Copilot, Zed … |
 | `claude-desktop` | `koban.zip`                           | Claude Desktop (upload via Settings)                |
 | `cursor`         | `.cursor/rules/koban.mdc`             | Cursor (project rule)                               |
 | `plugin`         | `koban/.claude-plugin/plugin.json`    | Claude Code plugin bundle                           |
 | `all`            | `claude-code` + `codex` + `agents-md` | the practical default bundle                        |
+
+The `.agents/skills/` directory written by the `codex` target is also read by
+pi, so most pi setups are already covered by `codex`. Use the dedicated `pi`
+target only when you want the skill in pi's native `.pi/skills/` location.
 
 With `--global`, file targets install into `~/.claude`, `~/.agents`,
 `~/.pi/agent`, and `~/.codex/AGENTS.md`. The `claude-desktop` zip and `plugin`

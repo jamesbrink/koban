@@ -191,9 +191,12 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
             tag,
             nightly,
         }) => update::run(check, force, tag, nightly),
-        // Auth, Skill, and Completions are dispatched before a config is
-        // resolved, so they never reach this point.
-        Some(Commands::Auth(_)) | Some(Commands::Skill(_)) => Ok(String::new()),
+        // Auth and Skill are dispatched in `execute` before a config is
+        // resolved; reaching here means a dispatch wiring mistake, so fail loudly
+        // instead of silently succeeding.
+        Some(Commands::Auth(_)) | Some(Commands::Skill(_)) => {
+            unreachable!("auth and skill commands are dispatched before config resolution")
+        }
         Some(Commands::Completions { .. }) | None => Ok(String::new()),
     }
 }
