@@ -35,12 +35,15 @@ truncation programmatically.
 
 ## PDF downloads
 
-Invoice PDF downloads write bytes to an explicit file path rather than to
-stdout. Existing files are not overwritten unless `--force` is set:
+PDF downloads write bytes to an explicit file path rather than to stdout.
+Existing files are not overwritten unless `--force` is set:
 
 ```sh
 koban invoices download <invitation_key> --output-file invoice.pdf
 koban invoices delivery-note <id> --output-file delivery-note.pdf
+koban quotes download <invitation_key> --output-file quote.pdf
+koban purchase-orders download <invitation_key> --output-file purchase-order.pdf
 ```
 
-See [Invoices](/commands/invoices) for details.
+See [Invoices](/commands/invoices) and [Resource commands](/commands/resources)
+for details.

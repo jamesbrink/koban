@@ -158,16 +158,17 @@ The resource set includes `clients`, `invoices`, `payments`, `quotes`,
 `payment-terms`, `task-schedulers`, `task-statuses`, `activities`,
 `system-logs`, `documents`, `designs`, `templates`, `users`, `companies`,
 `company-gateways`, `company-ledger`, `company-users`, `tokens`, `webhooks`,
-`imports`, `subscriptions`, and `client-gateway-tokens`.
+`subscriptions`, and `client-gateway-tokens`.
 
 Some official resources do not publish the complete generic route set. Koban
 keeps the generic command surface consistent but rejects unsupported routes
 locally before networking, for example `documents upload`, `tax-rates create`,
 and `templates list`.
 
-Inspect-only/high-risk resources `activities`, `system-logs`, `company-ledger`,
-and `imports` expose only `list` and `show`. They intentionally do not expose
-the generic write command family.
+Inspect-only/audit resources `activities`, `system-logs`, and `company-ledger`
+expose only safe reads. Import/preimport endpoints are not listable resource
+families in the official OpenAPI spec and should get a dedicated guarded
+workflow before Koban exposes them as first-class commands.
 
 The `create` and `edit` routes above return blank/default or editable objects;
 they are read-only `GET` routes despite their names. Koban exposes them as
@@ -178,14 +179,17 @@ Utility-style endpoints are exposed through endpoint runners:
 
 ```text
 koban search run
-koban reports run
-koban charts run
+koban reports run --endpoint reports/invoices
+koban charts run --endpoint charts/totals
 koban utility run
 ```
 
-`search`, `reports`, and `charts` default to their matching endpoint names.
-Custom `--endpoint` overrides are read-only and only send `GET` requests.
-`utility run` defaults to `ping` and is always read-only.
+`search run` defaults to `POST /api/v1/search`. Report and chart commands use
+the endpoint runner but should pass a concrete endpoint such as
+`reports/invoices` or `charts/totals`; the official API does not publish
+`POST /api/v1/reports` or `POST /api/v1/charts` root endpoints. Custom
+`--endpoint` overrides are read-only and only send `GET` requests. `utility run`
+defaults to `ping` and is always read-only.
 
 ## Implemented Write Endpoints
 

@@ -20,9 +20,11 @@ koban <resource> action <id>
 koban <resource> upload <id>
 koban invoices download <invitation_key>
 koban invoices delivery-note <id>
+koban quotes download <invitation_key>
+koban purchase-orders download <invitation_key>
 koban search run
-koban reports run
-koban charts run
+koban reports run --endpoint reports/invoices
+koban charts run --endpoint charts/totals
 koban utility run
 ```
 
@@ -43,15 +45,18 @@ See [Resource commands](/commands/resources) for the shared verbs,
 
 `clients`, `invoices`, `payments`, `quotes`, `credits`, `vendors`, `expenses`,
 `projects`, `tasks`, `locations`, `products`, `recurring-invoices`,
-`purchase-orders`, `recurring-expenses`, `bank-transactions`,
-`bank-integrations`, `bank-transaction-rules`, `expense-categories`,
-`tax-rates`, `payment-terms`, `task-statuses`, `activities`, `system-logs`,
-`documents`, `designs`, `templates`, `users`, `companies`, `company-gateways`,
-`company-ledger`, `company-users`, `tokens`, `webhooks`, `imports`,
-`subscriptions`, and `client-gateway-tokens`.
+`purchase-orders`, `recurring-expenses`, `recurring-quotes`,
+`bank-transactions`, `bank-integrations`, `bank-transaction-rules`,
+`group-settings`, `expense-categories`, `tax-rates`, `payment-terms`,
+`task-schedulers`, `task-statuses`, `activities`, `system-logs`, `documents`,
+`designs`, `templates`, `users`, `companies`, `company-gateways`,
+`company-ledger`, `company-users`, `tokens`, `webhooks`, `subscriptions`, and
+`client-gateway-tokens`.
 
 Inspect-only/high-risk groups — `activities`, `system-logs`, `company-ledger`,
-and `imports` — expose only `list` and `show`. See the full breakdown in the
+and similar audit surfaces — expose only safe read commands. Import-style
+endpoints are not resource-list commands; use guarded endpoint workflows when
+they are added. See the full breakdown in the
 [Resource families reference](/reference/resource-families).
 
 ## Other commands

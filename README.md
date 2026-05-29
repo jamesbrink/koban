@@ -207,8 +207,8 @@ koban invoices delivery-note <id>
 koban quotes download <invitation_key>
 koban purchase-orders download <invitation_key>
 koban search run
-koban reports run
-koban charts run
+koban reports run --endpoint reports/invoices
+koban charts run --endpoint charts/totals
 koban utility run
 ```
 
@@ -223,11 +223,12 @@ first-class resource commands for mutations.
 `payment-terms`, `task-schedulers`, `task-statuses`, `activities`,
 `system-logs`, `documents`, `designs`, `templates`, `users`, `companies`,
 `company-gateways`, `company-ledger`, `company-users`, `tokens`, `webhooks`,
-`imports`, `subscriptions`, and `client-gateway-tokens`.
+`subscriptions`, and `client-gateway-tokens`.
 
-Inspect-only/high-risk groups `activities`, `system-logs`, `company-ledger`,
-and `imports` expose only `list` and `show`. They do not expose generic write
-commands.
+Inspect-only/audit groups `activities`, `system-logs`, and `company-ledger`
+expose only safe reads. Import/preimport endpoints are not listable resource
+families in the official OpenAPI spec, so they are intentionally left for a
+dedicated guarded workflow.
 
 Some official resources publish narrower route sets than the generic command
 shape. Koban rejects unsupported commands locally before networking, such as

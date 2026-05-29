@@ -9,7 +9,7 @@ koban exposes Invoice Ninja resources through three command profiles:
 - **Invoices** — the full shape plus `download` and `delivery-note`.
 - **Guarded partial** — generic commands are present, but commands for routes
   not published by the official API fail locally with an explicit message.
-  Some document resources also expose `download`.
+  Some payable/document resources also expose `download`.
 
 In the **library**, a subset of resources has typed model accessors
 (`client.invoices()`, etc.); every resource is reachable via the generic
@@ -57,10 +57,13 @@ In the **library**, a subset of resources has typed model accessors
 | `activities`             | Inspect-only | generic        |
 | `system-logs`            | Inspect-only | generic        |
 | `company-ledger`         | Inspect-only | generic        |
-| `imports`                | Inspect-only | generic        |
 
 `download` is supported for `quotes`, `credits`, `recurring-invoices`, and
 `purchase-orders` using the official invitation-key PDF routes.
+
+Import/preimport endpoints are not listable resource families in the official
+OpenAPI spec. Koban keeps them out of the normal resource table until there is a
+dedicated guarded workflow.
 
 ## Endpoint runners
 
@@ -69,8 +72,8 @@ These are not resource families; they run named endpoints (see
 
 | CLI name  | Command          |
 | --------- | ---------------- |
-| `reports` | `run`            |
-| `charts`  | `run`            |
-| `search`  | `run`            |
+| `reports` | `run --endpoint reports/...` |
+| `charts`  | `run --endpoint charts/...`  |
+| `search`  | `run`                       |
 | `utility` | `run`            |
 | `statics` | (top-level read) |

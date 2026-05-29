@@ -43,10 +43,11 @@ The typed accessors unwrap these for you — `list()` returns `Vec<T>` and `get(
 returns `T` — while `list_paginated()` exposes the `Meta`. See
 [Resource accessors](/library/resources).
 
-## Resources not yet modeled
+## Resources without built-in models
 
-The ~25 other resources work through the generic methods using your own type or
-`serde_json::Value`:
+Koban intentionally keeps first-class structs focused on the common workflow
+objects above. Other resource families are still reachable through the generic
+resource API using your own type or `serde_json::Value`:
 
 ```rust
 use koban::Resource;
@@ -56,3 +57,6 @@ let tax_rates = client
     .list()
     .await?;
 ```
+
+This is a typed-model gap, not a CLI/API coverage gap. The full list of generic
+`Resource` variants is in [Resource families](/reference/resource-families).
