@@ -42,7 +42,7 @@ export default defineConfig({
   },
 
   sitemap: {
-    hostname: 'https://jamesbrink.github.io/koban/',
+    hostname: 'https://jamesbrink.online/koban/',
   },
 
   themeConfig: {

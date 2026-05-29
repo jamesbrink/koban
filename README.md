@@ -4,7 +4,7 @@
 [![koban on crates.io](https://img.shields.io/crates/v/koban.svg?label=koban)](https://crates.io/crates/koban)
 [![koban-cli on crates.io](https://img.shields.io/crates/v/koban-cli.svg?label=koban-cli)](https://crates.io/crates/koban-cli)
 [![docs.rs](https://img.shields.io/docsrs/koban?label=docs.rs)](https://docs.rs/koban)
-[![Docs](https://img.shields.io/badge/docs-website-D4AF37)](https://jamesbrink.github.io/koban/)
+[![Docs](https://img.shields.io/badge/docs-website-D4AF37)](https://jamesbrink.online/koban/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 `koban` is an early-stage Rust CLI for [Invoice Ninja](https://www.invoiceninja.com/).
@@ -16,7 +16,7 @@ The name is a nod to the _koban_ (小判), the Edo-period oval gold coin ninja w
 paid in — a short, currency-flavored name for a tool that drives an invoicing
 API.
 
-📖 **Documentation: <https://jamesbrink.github.io/koban/>**
+📖 **Documentation: <https://jamesbrink.online/koban/>**
 
 The project is a Cargo workspace with two crates:
 
@@ -347,7 +347,7 @@ docs-fmt-check  check documentation formatting (matches CI)
 ```
 
 The documentation website lives in `website/` (VitePress) and is published to
-GitHub Pages at <https://jamesbrink.github.io/koban/> by
+GitHub Pages at <https://jamesbrink.online/koban/> by
 `.github/workflows/pages.yml` on pushes to `main` that touch `website/`.
 
 The devshell also loads `INVOICE_NINJA_API_TOKEN` and
