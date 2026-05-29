@@ -56,7 +56,9 @@
             fileset = lib.fileset.unions [
               (lib.fileset.fileFilter (
                 file:
-                file.hasExt "rs" || file.name == "Cargo.toml" || file.name == "Cargo.lock"
+                file.hasExt "rs"
+                || file.name == "Cargo.toml"
+                || file.name == "Cargo.lock"
                 || file.name == "README.md"
               ) ./.)
               ./.github/workflows
