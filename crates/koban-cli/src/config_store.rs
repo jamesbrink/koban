@@ -187,33 +187,58 @@ pub(crate) fn save(base_url: Option<String>, token: &str, use_keychain: bool) ->
     Ok(path)
 }
 
-/// Resolve `(base_url, token)` following the documented precedence.
+/// Resolve `(base_url, token)`.
+///
+/// Base-URL resolution is coupled to the token's source so a credential never
+/// crosses sources: an environment token is paired only with an environment (or
+/// default) base URL — never a stored one — matching the previous
+/// `Config::from_env` behavior and keeping env-driven runs self-contained.
 pub(crate) fn resolve() -> Result<(String, String)> {
     let stored = load_file().unwrap_or_default();
 
-    let base_url = env_non_empty(BASE_URL_ENV)
-        .or(stored.base_url.clone())
-        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
-
-    let token = resolve_token(&stored)?;
-    Ok((base_url, token))
-}
-
-fn resolve_token(stored: &StoredConfig) -> Result<String> {
     if let Some(token) = env_non_empty(API_TOKEN_ENV) {
-        return Ok(token);
+        return Ok((resolve_base_url(TokenSource::Env, &stored), token));
     }
 
+    let (source, token) = resolve_stored_token(&stored)?;
+    Ok((resolve_base_url(source, &stored), token))
+}
+
+/// Resolve a token from stored credentials (keychain or file), reporting which.
+fn resolve_stored_token(stored: &StoredConfig) -> Result<(TokenSource, String)> {
     if stored.keychain {
-        return keychain_get()?.ok_or(KobanError::MissingToken);
+        return keychain_get()?
+            .map(|token| (TokenSource::Keychain, token))
+            .ok_or(KobanError::MissingToken);
     }
 
     stored
         .api_token
         .as_ref()
         .filter(|token| !token.trim().is_empty())
-        .cloned()
+        .map(|token| (TokenSource::File, token.clone()))
         .ok_or(KobanError::MissingToken)
+}
+
+/// Resolve the base URL for a token of the given source. An explicit
+/// `INVOICE_NINJA_BASE_URL` always wins; otherwise an environment token falls
+/// back to the default (never a stored URL), while a stored token uses its
+/// stored URL.
+fn resolve_base_url(source: TokenSource, stored: &StoredConfig) -> String {
+    if let Some(base_url) = env_non_empty(BASE_URL_ENV) {
+        return base_url;
+    }
+    match source {
+        TokenSource::Keychain | TokenSource::File => stored.base_url.clone(),
+        TokenSource::Env | TokenSource::None => None,
+    }
+    .unwrap_or_else(|| DEFAULT_BASE_URL.to_string())
+}
+
+/// The base URL recorded in the config file, if any. Used by `login` to default
+/// to (and re-verify against) the previously stored host.
+pub(crate) fn stored_base_url() -> Result<Option<String>> {
+    Ok(load_file()?.base_url)
 }
 
 /// Report the active credential source without exposing the token.
@@ -234,9 +259,7 @@ pub(crate) fn status() -> Result<AuthStatus> {
         TokenSource::None
     };
 
-    let base_url = env_non_empty(BASE_URL_ENV)
-        .or(stored.base_url)
-        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+    let base_url = resolve_base_url(source, &stored);
 
     Ok(AuthStatus {
         source,

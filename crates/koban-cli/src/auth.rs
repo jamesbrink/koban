@@ -25,12 +25,14 @@ async fn login(output: OutputFormat, args: AuthLoginArgs) -> Result<String> {
         return Err(KobanError::MissingToken);
     }
 
-    // Validate the base URL (and token) up front so a bad value fails before we
-    // persist anything. This also produces the URL we verify against.
-    let base_url = args
-        .base_url
-        .clone()
-        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+    // Determine the effective base URL: an explicit --base-url, else the
+    // previously stored one, else the default. We verify against this exact URL
+    // and persist it, so a re-login can't report success against one host while
+    // later commands target another.
+    let base_url = match args.base_url.clone() {
+        Some(base_url) => base_url,
+        None => config_store::stored_base_url()?.unwrap_or_else(|| DEFAULT_BASE_URL.to_string()),
+    };
     let config = Config::from_values(&base_url, token.clone())?;
 
     if !args.no_verify {
@@ -40,7 +42,7 @@ async fn login(output: OutputFormat, args: AuthLoginArgs) -> Result<String> {
             .await?;
     }
 
-    let path = config_store::save(args.base_url, &token, args.keychain)?;
+    let path = config_store::save(Some(base_url.clone()), &token, args.keychain)?;
     let storage = if args.keychain {
         "keychain"
     } else {

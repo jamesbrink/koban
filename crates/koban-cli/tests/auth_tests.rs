@@ -227,6 +227,77 @@ fn environment_token_takes_precedence_over_stored_file() {
     clients.assert();
 }
 
+#[test]
+fn environment_token_ignores_a_stored_base_url() {
+    // Regression: an env token with no env base URL must not inherit a stale
+    // stored base URL — it falls back to the default, like the old from_env().
+    let dir = tempdir().expect("tempdir");
+    koban()
+        .env("KOBAN_CONFIG_DIR", dir.path())
+        .args([
+            "auth",
+            "login",
+            "--token",
+            "stored-tok",
+            "--base-url",
+            "https://stale.example.com",
+            "--no-verify",
+        ])
+        .assert()
+        .success();
+
+    koban()
+        .env("KOBAN_CONFIG_DIR", dir.path())
+        .env("INVOICE_NINJA_API_TOKEN", "env-tok")
+        .args(["--output", "json", "auth", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"source\": \"environment\""))
+        .stdout(predicate::str::contains("https://invoicing.co"))
+        .stdout(predicate::str::contains("stale.example.com").not());
+}
+
+#[test]
+fn relogin_without_base_url_verifies_against_and_keeps_the_stored_host() {
+    // Regression: re-login without --base-url must verify against (and persist)
+    // the previously stored host, not silently fall back to the default.
+    let server = MockServer::start();
+    let statics = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/statics")
+            .header("X-API-TOKEN", "tok-second");
+        then.status(200).json_body(json_empty());
+    });
+    let dir = tempdir().expect("tempdir");
+
+    koban()
+        .env("KOBAN_CONFIG_DIR", dir.path())
+        .args([
+            "auth",
+            "login",
+            "--token",
+            "tok-first",
+            "--base-url",
+            &server.base_url(),
+            "--no-verify",
+        ])
+        .assert()
+        .success();
+
+    // No --base-url: must verify the new token against the stored server.
+    koban()
+        .env("KOBAN_CONFIG_DIR", dir.path())
+        .args(["auth", "login", "--token", "tok-second"])
+        .assert()
+        .success();
+
+    statics.assert();
+
+    let contents = std::fs::read_to_string(dir.path().join("config.json")).expect("config");
+    assert!(contents.contains(&server.base_url()));
+    assert!(contents.contains("tok-second"));
+}
+
 fn json_empty() -> serde_json::Value {
     serde_json::json!({ "data": [] })
 }
