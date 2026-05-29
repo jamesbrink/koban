@@ -54,6 +54,46 @@ fn release_publish_crate_is_gated_on_registry_token() {
     );
 }
 
+#[test]
+fn release_workflow_supports_first_release_dispatch() {
+    let workflow =
+        fs::read_to_string(workspace_root().join(".github/workflows/release-please.yml"))
+            .expect("read release workflow");
+
+    assert!(
+        workflow.contains("description: \"Release tag to build and publish"),
+        "manual release dispatch should accept a tag to create or reuse"
+    );
+    assert!(
+        workflow.contains("git tag \"$TAG\" \"$GITHUB_SHA\""),
+        "manual release dispatch should create the tag when it does not exist"
+    );
+    assert!(
+        workflow.contains("git push origin \"refs/tags/$TAG\""),
+        "manual release dispatch should push the created release tag"
+    );
+}
+
+#[test]
+fn release_publish_waits_for_library_before_cli_crate() {
+    let workflow =
+        fs::read_to_string(workspace_root().join(".github/workflows/release-please.yml"))
+            .expect("read release workflow");
+
+    assert!(
+        workflow.contains("for attempt in 1 2 3 4 5 6"),
+        "CLI crate publish should retry while crates.io indexes the freshly published library"
+    );
+    assert!(
+        workflow.contains("cargo search koban --limit 1"),
+        "CLI crate publish should refresh the crates.io index between publish attempts"
+    );
+    assert!(
+        workflow.contains("publish_with_retry koban-cli"),
+        "release workflow must still publish the CLI crate"
+    );
+}
+
 fn collect_rust_file_failures(dir: &Path, failures: &mut Vec<String>) {
     for entry in fs::read_dir(dir).unwrap_or_else(|error| panic!("read {}: {error}", dir.display()))
     {
