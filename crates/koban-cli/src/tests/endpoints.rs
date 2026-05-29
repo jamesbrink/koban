@@ -61,6 +61,35 @@ async fn reports_default_to_post() {
 }
 
 #[tokio::test]
+async fn endpoint_invalid_paths_fail_before_network() {
+    let config = Config::from_values("http://localhost:1234", "token").expect("config");
+
+    let error = execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Utility(EndpointCommand::Run(EndpointArgs {
+                endpoint: Some("../admin".to_string()),
+                method: Some(HttpMethod::Get),
+                payload: empty_resource_payload_args(),
+                safety: WriteSafetyArgs {
+                    dry_run: true,
+                    yes: false,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect_err("route-changing endpoint path should fail");
+    assert!(matches!(error, KobanError::InvalidPayload { .. }));
+    assert!(
+        error.to_string().contains("relative /api/v1 path"),
+        "got: {error}"
+    );
+}
+
+#[tokio::test]
 async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
     let config = Config::from_values("http://localhost:1234", "token").expect("config");
 
@@ -90,6 +119,69 @@ async fn endpoint_get_and_delete_reject_payloads_instead_of_dropping_them() {
         assert!(matches!(error, KobanError::InvalidPayload { .. }));
         assert!(error.to_string().contains(method.label()), "got: {error}");
     }
+}
+
+#[tokio::test]
+async fn endpoint_post_and_delete_hit_live_routes_when_confirmed() {
+    let server = MockServer::start();
+    let config = Config::from_values(server.base_url(), "token").expect("config");
+
+    let report_post = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/reports/invoices");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"name": "invoices"}}));
+    });
+    let report_delete = server.mock(|when, then| {
+        when.method(httpmock::Method::DELETE)
+            .path("/api/v1/reports");
+        then.status(200)
+            .json_body(serde_json::json!({"data": {"deleted": true}}));
+    });
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
+                endpoint: Some("reports/invoices".to_string()),
+                method: Some(HttpMethod::Post),
+                payload: {
+                    let mut args = empty_resource_payload_args();
+                    args.fields.push("date_range=last30".to_string());
+                    args
+                },
+                safety: WriteSafetyArgs {
+                    dry_run: false,
+                    yes: true,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config.clone(),
+    )
+    .await
+    .expect("report post");
+
+    execute_with_config(
+        Cli {
+            output: OutputFormat::Json,
+            command: Some(Commands::Reports(EndpointCommand::Run(EndpointArgs {
+                endpoint: None,
+                method: Some(HttpMethod::Delete),
+                payload: empty_resource_payload_args(),
+                safety: WriteSafetyArgs {
+                    dry_run: false,
+                    yes: true,
+                },
+                include: Vec::new(),
+            }))),
+        },
+        config,
+    )
+    .await
+    .expect("report delete");
+
+    report_post.assert();
+    report_delete.assert();
 }
 
 #[tokio::test]

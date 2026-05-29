@@ -189,3 +189,45 @@ async fn unsupported_resource_routes_fail_before_network() {
         "got: {documents_upload}"
     );
 }
+
+#[test]
+fn route_helpers_cover_special_document_and_bulk_paths() {
+    assert_eq!(
+        resource_update_path(Resource::PurchaseOrders, "po_1"),
+        "api/v1/purchase_order/po_1"
+    );
+    assert_eq!(
+        resource_delete_path(Resource::PurchaseOrders, "po_1"),
+        "api/v1/purchase_order/po_1"
+    );
+
+    let route = resource_action_route(Resource::Products, "product_1", "archive");
+    assert_eq!(route.method, HttpMethod::Post);
+    assert_eq!(route.path, "api/v1/products/bulk");
+    assert!(route.body);
+    assert!(route.is_bulk);
+
+    assert!(resource_download_base_path(Resource::Clients).is_none());
+}
+
+#[test]
+fn unsupported_capability_errors_name_the_rejected_verb() {
+    for (resource, capability, label) in [
+        (Resource::Templates, ResourceCapability::List, "list"),
+        (Resource::Activities, ResourceCapability::Show, "show"),
+        (Resource::TaxRates, ResourceCapability::Template, "template"),
+        (
+            Resource::Locations,
+            ResourceCapability::EditTemplate,
+            "edit-template",
+        ),
+        (Resource::TaxRates, ResourceCapability::Create, "create"),
+        (Resource::CompanyUsers, ResourceCapability::Update, "update"),
+        (Resource::CompanyUsers, ResourceCapability::Delete, "delete"),
+        (Resource::Locations, ResourceCapability::Bulk, "bulk"),
+    ] {
+        let error =
+            require_resource_capability(resource, capability).expect_err("capability rejected");
+        assert!(error.to_string().contains(label), "{label}: {error}");
+    }
+}
