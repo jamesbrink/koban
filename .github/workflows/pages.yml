@@ -31,7 +31,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: website
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Build docs
         working-directory: website

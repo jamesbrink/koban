@@ -10,7 +10,7 @@ variant per failure mode:
 | ---------------------- | -------------------------------------------------------- |
 | `MissingToken`         | `INVOICE_NINJA_API_TOKEN` is not configured.             |
 | `InvalidBaseUrl`       | The base URL could not be parsed.                        |
-| `InsecureBaseUrl`      | The base URL is not HTTPS.                               |
+| `InsecureBaseUrl`      | The base URL is not HTTPS (and is not a local host).     |
 | `InvalidEndpoint`      | An API URL could not be built for a path.                |
 | `Transport`            | The request could not reach Invoice Ninja.               |
 | `Api`                  | Invoice Ninja returned a non-success HTTP status.        |

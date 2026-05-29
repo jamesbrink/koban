@@ -29,7 +29,9 @@ assert!(DEFAULT_BASE_URL.starts_with("https://"));
 ```
 
 `Config::from_env()` requires `INVOICE_NINJA_API_TOKEN`; a missing token yields
-`KobanError::MissingToken`. The base URL must be HTTPS, or you get
+`KobanError::MissingToken`. The base URL must use HTTPS — the one exception is
+local hosts (`localhost`, `127.0.0.1`, `::1`), which may use plain HTTP for
+self-hosted development. Any other non-HTTPS URL yields
 `KobanError::InsecureBaseUrl`.
 
 ## Installer & updater variables

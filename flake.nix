@@ -367,7 +367,7 @@
                 category = "docs";
                 name = "docs-preview";
                 help = "preview the built documentation site";
-                command = "cd website && bun run preview \"$@\"";
+                command = "cd website && bun install && bun run preview \"$@\"";
               }
               {
                 category = "docs";
