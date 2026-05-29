@@ -9,8 +9,9 @@ fi
 # This helper mutates data, so it must only ever touch the public demo API.
 # Warn (without echoing the secret) if a non-demo credential was inherited from
 # the devshell .env, then hard-code the demo endpoint. `readonly` overrides any
-# inherited value and aborts under `set -u` if the value was already frozen, so
-# a real account can never be reached even by accident.
+# inherited (non-readonly) value; if the variable were already readonly the
+# reassignment fails and `set -e` aborts the script, so a real account can never
+# be reached even by accident.
 DEMO_BASE_URL="https://demo.invoiceninja.com"
 DEMO_API_TOKEN="TOKEN"
 if { [ -n "${INVOICE_NINJA_API_TOKEN:-}" ] && [ "${INVOICE_NINJA_API_TOKEN}" != "${DEMO_API_TOKEN}" ]; } ||
