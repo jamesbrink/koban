@@ -6,9 +6,26 @@ if [ "${KOBAN_LIVE_WRITE_SMOKE:-}" != "1" ]; then
   exit 2
 fi
 
-readonly INVOICE_NINJA_BASE_URL="https://demo.invoiceninja.com"
-readonly INVOICE_NINJA_API_TOKEN="TOKEN"
+# This helper mutates data, so it must only ever touch the public demo API.
+# Warn (without echoing the secret) if a non-demo credential was inherited from
+# the devshell .env, then hard-code the demo endpoint. `readonly` overrides any
+# inherited value and aborts under `set -u` if the value was already frozen, so
+# a real account can never be reached even by accident.
+DEMO_BASE_URL="https://demo.invoiceninja.com"
+DEMO_API_TOKEN="TOKEN"
+if { [ -n "${INVOICE_NINJA_API_TOKEN:-}" ] && [ "${INVOICE_NINJA_API_TOKEN}" != "${DEMO_API_TOKEN}" ]; } ||
+  { [ -n "${INVOICE_NINJA_BASE_URL:-}" ] && [ "${INVOICE_NINJA_BASE_URL}" != "${DEMO_BASE_URL}" ]; }; then
+  echo "Ignoring inherited Invoice Ninja credentials; this smoke test only uses the public demo." >&2
+fi
+readonly INVOICE_NINJA_BASE_URL="${DEMO_BASE_URL}"
+readonly INVOICE_NINJA_API_TOKEN="${DEMO_API_TOKEN}"
 export INVOICE_NINJA_BASE_URL INVOICE_NINJA_API_TOKEN
+
+# Belt and suspenders: refuse to run if anything is not the public demo.
+if [ "${INVOICE_NINJA_BASE_URL}" != "${DEMO_BASE_URL}" ] || [ "${INVOICE_NINJA_API_TOKEN}" != "${DEMO_API_TOKEN}" ]; then
+  echo "Refusing to run: smoke endpoint is not the public Invoice Ninja demo API." >&2
+  exit 1
+fi
 
 echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
