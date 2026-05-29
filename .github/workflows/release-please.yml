@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing git tag to build and publish (for example v0.1.0)"
+        description: "Release tag to build and publish, creating it from this ref if needed (for example v0.1.0)"
         required: true
         type: string
 
@@ -49,10 +49,33 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
     steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          fetch-depth: 0
+
       - id: resolve
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            TAG="$TAG_INPUT"
+            if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Release tag must look like v0.1.0; got '$TAG'"
+              exit 1
+            fi
+
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+              echo "Using existing tag $TAG"
+            else
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git tag "$TAG" "$GITHUB_SHA"
+              git push origin "refs/tags/$TAG"
+              echo "Created tag $TAG at $GITHUB_SHA"
+            fi
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${{ needs.release-please.outputs.tag_name }}" >> "$GITHUB_OUTPUT"
           fi
@@ -170,5 +193,44 @@ jobs:
         # be available on crates.io before the CLI publish resolves.
         run: |
           set -euo pipefail
-          cargo publish --locked -p koban
-          cargo publish --locked -p koban-cli
+
+          package_version() {
+            cargo metadata --no-deps --format-version 1 \
+              | jq -r --arg package "$1" '.packages[] | select(.name == $package) | .version'
+          }
+
+          crate_is_published() {
+            package="$1"
+            version="$2"
+            cargo search "$package" --limit 1 | grep -E "^${package} = \"${version}\"" >/dev/null 2>&1
+          }
+
+          publish_with_retry() {
+            package="$1"
+            version="$(package_version "$package")"
+
+            for attempt in 1 2 3 4 5 6; do
+              if crate_is_published "$package" "$version"; then
+                echo "$package $version is already published; skipping."
+                return 0
+              fi
+
+              if cargo publish --locked -p "$package"; then
+                echo "Published $package $version."
+                return 0
+              fi
+
+              if [ "$attempt" -eq 6 ]; then
+                echo "::error::Failed to publish $package $version after $attempt attempts."
+                return 1
+              fi
+
+              sleep_seconds=$((attempt * 20))
+              echo "Publish for $package $version did not complete; refreshing crates.io index and retrying in ${sleep_seconds}s."
+              cargo search koban --limit 1 >/dev/null 2>&1 || true
+              sleep "$sleep_seconds"
+            done
+          }
+
+          publish_with_retry koban
+          publish_with_retry koban-cli
