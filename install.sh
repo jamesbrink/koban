@@ -10,7 +10,7 @@
 #   KOBAN_VERSION      release to install (default: latest)
 #                        latest   newest stable release
 #                        nightly  rolling prerelease built from main
-#                        vX.Y.Z   a specific tag, such as v0.1.0
+#                        vX.Y.Z   a specific tag, such as v0.2.0
 
 set -e
 
@@ -36,7 +36,7 @@ Examples:
   # rolling nightly build from main
   curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | KOBAN_VERSION=nightly sh
   # a specific tag into a custom directory
-  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | KOBAN_VERSION=v0.1.0 KOBAN_INSTALL_DIR=/usr/local/bin sh
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | KOBAN_VERSION=v0.2.0 KOBAN_INSTALL_DIR=/usr/local/bin sh
 EOF
 }
 

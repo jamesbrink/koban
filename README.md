@@ -7,10 +7,10 @@
 [![Docs](https://img.shields.io/badge/docs-website-D4AF37)](https://jamesbrink.online/koban/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-`koban` is an early-stage Rust CLI for [Invoice Ninja](https://www.invoiceninja.com/).
-The goal is a small, scriptable tool that feels good for humans at a terminal
-and predictable for AI agents that need stable JSON output, explicit errors, and
-shell completions.
+`koban` is a small, scriptable Rust CLI and client library for
+[Invoice Ninja](https://www.invoiceninja.com/), built for humans at a terminal
+and AI agents that need stable JSON output, explicit errors, and shell
+completions.
 
 The name is a nod to the _koban_ (小判), the Edo-period oval gold coin ninja were
 paid in — a short, currency-flavored name for a tool that drives an invoicing
@@ -25,9 +25,9 @@ The project is a Cargo workspace with two crates:
 - [`koban-cli`](https://crates.io/crates/koban-cli) — the **command-line tool**,
   which installs a `koban` binary (`cargo install koban-cli`).
 
-This repository is still early work: the CLI boots, reports its version,
-generates shell completions, exposes a broad Invoice Ninja API surface, and
-includes guarded write commands.
+The CLI exposes a broad Invoice Ninja API surface with guarded write commands,
+stable JSON for automation, human-friendly tables, shell completions, direct
+binary installs, and a reusable Rust client library.
 
 ## Install
 
@@ -42,22 +42,21 @@ Installer options:
 ```sh
 # A specific release tag, into a custom directory
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | \
-  KOBAN_VERSION="v0.1.0" KOBAN_INSTALL_DIR="$HOME/.local/bin" sh
+  KOBAN_VERSION="v0.2.0" KOBAN_INSTALL_DIR="$HOME/.local/bin" sh
 
-# The rolling nightly build from main (before the first stable release)
+# The rolling nightly build from main
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | \
   KOBAN_VERSION="nightly" sh
 ```
 
 `KOBAN_VERSION` accepts `latest` (default, newest stable release), `nightly`
-(the rolling prerelease built from `main`), or a tag such as `v0.1.0`. Pass
+(the rolling prerelease built from `main`), or a tag such as `v0.2.0`. Pass
 `--help` to the script (`sh install.sh --help`) to print usage.
 
 The installer downloads GitHub release tarballs, verifies `SHA256SUMS` when
 available, installs `koban` into `~/.local/bin` by default, and prints the
 installed version. It uses the same macOS/Linux asset names as release CI and
-`koban update`. Until the first stable release is tagged, `latest` will 404 and
-the installer points you at the `nightly` build.
+`koban update`.
 
 Other install paths:
 
@@ -468,7 +467,7 @@ The `install.sh` script is the supported `curl | sh` path for direct installs:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | sh
-curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_VERSION=v0.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_VERSION=v0.2.0 sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_VERSION=nightly sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | KOBAN_INSTALL_DIR=/usr/local/bin sh
 ```
@@ -481,7 +480,7 @@ recipe instead:
 koban update --check
 koban update --nightly --check
 koban update
-koban update --tag v0.1.0
+koban update --tag v0.2.0
 koban update --nightly
 ```
 

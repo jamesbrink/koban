@@ -6,7 +6,7 @@ release tarballs and verifying their checksums.
 ```sh
 koban update --check          # report whether a newer release exists
 koban update                  # download and install the latest release
-koban update --tag v0.1.0     # install a specific tagged release
+koban update --tag v0.2.0     # install a specific tagged release
 koban update --nightly --check
 koban update --nightly        # install the latest rolling nightly
 ```

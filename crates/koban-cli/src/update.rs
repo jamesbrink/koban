@@ -210,7 +210,7 @@ fn validate_tag(tag: &str) -> Result<()> {
         Ok(())
     } else {
         Err(KobanError::Update {
-            message: format!("invalid release tag `{tag}`; expected a tag like v0.1.0 or nightly"),
+            message: format!("invalid release tag `{tag}`; expected vX.Y.Z or nightly"),
         })
     }
 }
