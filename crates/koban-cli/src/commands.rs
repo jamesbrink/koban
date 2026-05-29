@@ -3,12 +3,14 @@ use serde_json::{Value, json};
 use koban::{ApiClient, Config, KobanError, Resource, Result};
 
 use crate::{
+    auth,
     cli::{
         BulkArgs, Cli, Commands, ConfirmableIdArgs, DownloadArgs, HttpMethod,
         InspectResourceCommand, InvoiceActionArgs, InvoiceCommand, InvoiceWriteArgs, ListArgs,
         OutputFormat, ResourceActionArgs, ResourceCommand, ResourceWriteArgs, UpdateInvoiceArgs,
         UpdateResourceArgs, UploadArgs,
     },
+    config_store,
     endpoint_runner::execute_endpoint,
     invoice::{
         invoice_payload, push_invoice_triggers, render_dry_run, require_confirmation,
@@ -20,7 +22,7 @@ use crate::{
         ResourceCapability, require_resource_capability, resource_action_route,
         resource_delete_path, resource_download_base_path, resource_update_path,
     },
-    update,
+    skill, update,
 };
 
 pub(crate) use crate::file_paths::{ensure_download_path, ensure_upload_file, write_download_file};
@@ -38,8 +40,13 @@ pub async fn execute(cli: Cli) -> Result<String> {
             tag,
             nightly,
         }) => update::run(check, force, tag, nightly),
+        // Auth and skill commands run without a resolved token: login is how a
+        // token is obtained, and the skill generator describes the CLI offline.
+        Some(Commands::Auth(command)) => auth::execute(output, command).await,
+        Some(Commands::Skill(command)) => skill::execute(output, command),
         command => {
-            let config = Config::from_env()?;
+            let (base_url, token) = config_store::resolve()?;
+            let config = Config::from_values(base_url, token)?;
             execute_with_config(Cli { output, command }, config).await
         }
     }
@@ -184,6 +191,12 @@ pub async fn execute_with_config(cli: Cli, config: Config) -> Result<String> {
             tag,
             nightly,
         }) => update::run(check, force, tag, nightly),
+        // Auth and Skill are dispatched in `execute` before a config is
+        // resolved; reaching here means a dispatch wiring mistake, so fail loudly
+        // instead of silently succeeding.
+        Some(Commands::Auth(_)) | Some(Commands::Skill(_)) => {
+            unreachable!("auth and skill commands are dispatched before config resolution")
+        }
         Some(Commands::Completions { .. }) | None => Ok(String::new()),
     }
 }

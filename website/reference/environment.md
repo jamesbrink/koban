@@ -2,10 +2,15 @@
 
 ## Variables
 
-| Variable                  | Required | Default                | Notes                                      |
-| ------------------------- | -------- | ---------------------- | ------------------------------------------ |
-| `INVOICE_NINJA_API_TOKEN` | yes      | —                      | Sent as `X-API-TOKEN`. Never printed.      |
-| `INVOICE_NINJA_BASE_URL`  | no       | `https://invoicing.co` | Hosted production or self-hosted base URL. |
+| Variable                  | Required | Default                | Notes                                              |
+| ------------------------- | -------- | ---------------------- | -------------------------------------------------- |
+| `INVOICE_NINJA_API_TOKEN` | no\*     | —                      | Sent as `X-API-TOKEN`. Never printed.              |
+| `INVOICE_NINJA_BASE_URL`  | no       | `https://invoicing.co` | Hosted production or self-hosted base URL.         |
+| `KOBAN_CONFIG_DIR`        | no       | platform config dir    | Overrides where `koban auth` stores `config.json`. |
+
+\* A token is required, but it may come from `INVOICE_NINJA_API_TOKEN`, the OS
+keychain, or the stored config file — see [Authentication](/commands/auth). The
+environment variable always takes precedence.
 
 For the public demo API, set the base URL to
 `https://demo.invoiceninja.com` and the token to `TOKEN`.

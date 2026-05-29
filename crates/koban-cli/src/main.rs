@@ -1,11 +1,16 @@
+mod auth;
 mod cli;
+mod cli_agent;
 mod commands;
+mod completion;
+mod config_store;
 mod endpoint_runner;
 mod file_paths;
 mod invoice;
 mod payload;
 mod render;
 mod resource_routes;
+mod skill;
 mod update;
 
 use clap::{CommandFactory, Parser};

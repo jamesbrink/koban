@@ -66,7 +66,24 @@ koban completions zsh
 koban completions bash
 koban completions fish
 koban completions nushell
+
+# Authentication (stores the token in a 0600 config file or the OS keychain)
+koban auth login --token <token>
+koban auth login --keychain
+echo "$TOKEN" | koban auth login --no-verify
+koban auth status
+koban auth logout
+
+# Agent skill (teach Claude Code, Codex, pi, Cursor, ... how to drive koban)
+koban skill generate                       # write to ./koban-skills for review
+koban skill install --target claude-code   # into ./.claude/skills/koban
+koban skill install --global --target all  # into ~/.claude, ~/.agents, AGENTS.md
+koban skill install --target claude-desktop # build koban.zip to upload
 ```
+
+Credentials resolve in this order, so agents and CI stay deterministic:
+`INVOICE_NINJA_API_TOKEN` env → OS keychain → stored config file. Set
+`KOBAN_CONFIG_DIR` to override where the config file lives.
 
 The implemented API commands cover read workflows, guided/JSON writes,
 bulk/custom actions, and uploads across Invoice Ninja resource families.

@@ -41,7 +41,16 @@ write commands:
   demo-only, opt-in, and creates/cleans up its own fixtures.
 - Use production or personal accounts only for intentional checks.
 - Keep token handling environment-first with `INVOICE_NINJA_API_TOKEN` and
-  optional `INVOICE_NINJA_BASE_URL`.
+  optional `INVOICE_NINJA_BASE_URL`. `koban auth login` may also persist a token,
+  but env vars always win. Credential resolution lives in `koban-cli`'s
+  `config_store` (env → OS keychain → `0600` config file at the platform config
+  dir, overridable with `KOBAN_CONFIG_DIR`); the publishable library stays free
+  of disk/keychain I/O. Keychain support is the default-on `keychain` cargo
+  feature in `koban-cli`.
+- `koban skill generate`/`install` emit the agent skill. Keep one shared body in
+  `skill/templates.rs` with target-correct frontmatter per kind (Claude Code,
+  Codex, pi, Cursor `.mdc`, plugin JSON, and a marker-wrapped `AGENTS.md` block).
+  `--target all` = `claude-code` + `codex` + `agents-md`.
 - Redact tokens in errors, traces, fixtures, and docs.
 - Preserve stable JSON output for agents alongside useful table output for
   humans.
