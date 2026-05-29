@@ -18,12 +18,12 @@ Pin a version or change the install directory with environment variables:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | \
-  KOBAN_VERSION="v0.1.0" KOBAN_INSTALL_DIR="$HOME/.local/bin" sh
+  KOBAN_VERSION="v0.2.0" KOBAN_INSTALL_DIR="$HOME/.local/bin" sh
 ```
 
 | Variable            | Default        | Purpose                                            |
 | ------------------- | -------------- | -------------------------------------------------- |
-| `KOBAN_VERSION`     | `latest`       | Release tag to install (e.g. `v0.1.0`, `nightly`). |
+| `KOBAN_VERSION`     | `latest`       | Release tag to install (e.g. `v0.2.0`, `nightly`). |
 | `KOBAN_INSTALL_DIR` | `~/.local/bin` | Directory to install the binary into.              |
 
 ```sh

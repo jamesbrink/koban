@@ -5,9 +5,9 @@ hero:
   name: koban
   text: Invoice Ninja from the terminal
   tagline:
-    A small, scriptable Rust CLI and client library for Invoice Ninja — good for
-    humans at a terminal, predictable for agents that need stable JSON, explicit
-    errors, and shell completions.
+    A small, scriptable Rust CLI and client library for Invoice Ninja, built for
+    humans at a terminal and AI agents that need stable JSON, explicit errors,
+    and shell completions.
   actions:
     - theme: brand
       text: Get Started →

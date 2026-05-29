@@ -1,8 +1,9 @@
 # What is koban?
 
-`koban` is a small, scriptable Rust CLI for [Invoice Ninja](https://www.invoiceninja.com/).
-The goal is a tool that feels good for humans at a terminal and predictable for
-AI agents that need stable JSON output, explicit errors, and shell completions.
+`koban` is a small, scriptable Rust CLI and client library for
+[Invoice Ninja](https://www.invoiceninja.com/), built for humans at a terminal
+and AI agents that need stable JSON output, explicit errors, and shell
+completions.
 
 The project is a Cargo workspace with two crates:
 
@@ -11,8 +12,9 @@ The project is a Cargo workspace with two crates:
 - [`koban-cli`](https://crates.io/crates/koban-cli) — the **command-line tool**,
   which installs a `koban` binary (`cargo install koban-cli`).
 
-The CLI boots, reports its version, generates shell completions, exposes a broad
-Invoice Ninja API surface, and includes guarded write commands.
+The CLI exposes a broad Invoice Ninja API surface with guarded write commands,
+stable JSON for automation, human-friendly tables, shell completions, direct
+binary installs, and a reusable Rust client library.
 
 ## Design principles
 
