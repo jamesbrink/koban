@@ -1,26 +1,29 @@
 # Koban Copilot Instructions
 
-Koban is an early-stage Rust CLI for Invoice Ninja. It is built for humans at a
-terminal and AI agents that need stable JSON, explicit errors, and predictable
-shell completion.
+Koban is a Cargo workspace: a reusable Invoice Ninja API client library
+(`koban`) plus a CLI (`koban-cli`) built for humans at a terminal and AI agents
+that need stable JSON, explicit errors, and predictable shell completion.
 
 Treat `AGENTS.md` as the primary source of repository instructions. `CLAUDE.md`
 is intentionally a symlink to `AGENTS.md`; do not replace it with a copied file.
 
 ## Architecture
 
-- `src/main.rs` is the thin binary entry point.
-- `src/lib.rs` re-exports the small public surface and wires focused modules.
-- `src/cli.rs` owns clap command definitions and help/completion metadata.
-- `src/api.rs`, `src/config.rs`, and `src/error.rs` own HTTP, environment
-  configuration, and diagnostics.
-- `src/commands.rs`, `src/invoice.rs`, `src/payload.rs`, and `src/render.rs`
-  own dispatch, payload/safety helpers, and output shaping.
-- `src/update.rs` owns direct release-tarball self-update behavior.
-- `tests/cli_tests.rs` and `tests/completions_tests.rs` cover user-facing CLI
-  behavior.
+- `crates/koban` is the library crate. `src/lib.rs` re-exports the public
+  surface; `src/api.rs`, `src/config.rs`, and `src/error.rs` own HTTP,
+  environment configuration, and diagnostics (`miette` is an optional feature);
+  `src/resource.rs` and `src/models/` define resources and typed models;
+  `src/typed.rs` adds the typed resource accessors.
+- `crates/koban-cli` is the CLI crate (package `koban-cli`, binary `koban`).
+  `src/main.rs` is the thin entry point; `src/cli.rs` owns clap definitions;
+  `src/commands.rs`, `src/invoice.rs`, `src/payload.rs`, and `src/render.rs` own
+  dispatch, payload/safety helpers, and output shaping; `src/update.rs` owns
+  release-tarball self-update.
+- `crates/koban-cli/tests/*.rs` cover user-facing CLI behavior; per-crate
+  `src/tests/` modules hold unit tests.
 - `docs/invoice-ninja-api.md` records API research and safe starting points.
 - `flake.nix` defines the pure package/app/checks and the devshell helper menu.
+- Run CLI commands with `cargo run -p koban-cli -- ...` from the workspace root.
 
 ## Safety
 

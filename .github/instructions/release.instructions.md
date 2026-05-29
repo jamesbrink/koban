@@ -2,7 +2,8 @@
 applyTo: "install.sh,README.md,AGENTS.md,CLAUDE.md,.github/workflows/*.yml,release-please-config.json,.release-please-manifest.json,flake.nix"
 ---
 
-Keep release assets aligned across release CI, `install.sh`, and `src/update.rs`:
+Keep release assets aligned across release CI, `install.sh`, and
+`crates/koban-cli/src/update.rs`:
 
 - `koban-aarch64-apple-darwin.tar.gz`
 - `koban-x86_64-apple-darwin.tar.gz`

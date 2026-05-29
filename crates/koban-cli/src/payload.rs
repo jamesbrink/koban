@@ -6,7 +6,9 @@ use std::{
 
 use serde_json::Value;
 
-use crate::{KobanError, Result, cli::ResourcePayloadArgs};
+use koban::{KobanError, Result};
+
+use crate::cli::ResourcePayloadArgs;
 
 #[derive(Debug, Clone, Default)]
 pub struct GenericPayloadArgs {

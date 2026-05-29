@@ -44,7 +44,7 @@ case "${OS}" in
         echo "Error: unsupported OS: ${OS}" >&2
         echo "  koban ships prebuilt binaries for Linux and macOS." >&2
         echo "  For other platforms, install via cargo:" >&2
-        echo "    cargo install koban" >&2
+        echo "    cargo install koban-cli" >&2
         exit 1
         ;;
 esac

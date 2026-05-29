@@ -13,7 +13,7 @@ use std::{
 
 use sha2::{Digest, Sha256};
 
-use crate::{KobanError, Result};
+use koban::{KobanError, Result};
 
 const GITHUB_REPO: &str = "jamesbrink/koban";
 const NIGHTLY_TAG: &str = "nightly";
@@ -529,12 +529,14 @@ mod tests {
 
     #[test]
     fn latest_check_uses_redirect_without_downloading_assets() {
-        let ops = FakeOps::new("v0.0.2", PathBuf::from("/tmp/koban"), b"unused");
+        // 9.9.9 is a sentinel that is always newer than the real crate version,
+        // so this stays green across release bumps.
+        let ops = FakeOps::new("v9.9.9", PathBuf::from("/tmp/koban"), b"unused");
 
         let output = run_with_ops(&ops, true, false, None, false).expect("latest check");
 
         assert!(
-            output.contains("New version available: 0.0.2"),
+            output.contains("New version available: 9.9.9"),
             "got: {output}"
         );
         assert_eq!(ops.curl_checks.get(), 1);
@@ -567,13 +569,15 @@ mod tests {
             .join("bin")
             .join("koban");
         std::fs::create_dir_all(exe.parent().expect("parent")).expect("bin dir");
-        let ops = FakeOps::new("v0.0.2", exe.clone(), &archive);
+        // 9.9.9 is always newer than the real crate version (an upgrade, not a
+        // downgrade), so the update proceeds regardless of release bumps.
+        let ops = FakeOps::new("v9.9.9", exe.clone(), &archive);
 
         let output =
-            run_with_ops(&ops, false, false, Some("v0.0.2".to_string()), false).expect("update");
+            run_with_ops(&ops, false, false, Some("v9.9.9".to_string()), false).expect("update");
 
         assert!(
-            output.contains(&format!("Updating: {} -> 0.0.2", env!("CARGO_PKG_VERSION"))),
+            output.contains(&format!("Updating: {} -> 9.9.9", env!("CARGO_PKG_VERSION"))),
             "got: {output}"
         );
         assert!(output.contains("Checksum verified"));
@@ -585,15 +589,15 @@ mod tests {
         let fetches = ops.fetches.borrow();
         assert_eq!(fetches.len(), 2);
         assert!(fetches.iter().any(
-            |url| url.ends_with("/v0.0.2/koban-aarch64-apple-darwin.tar.gz")
-                || url.ends_with("/v0.0.2/koban-x86_64-apple-darwin.tar.gz")
-                || url.ends_with("/v0.0.2/koban-x86_64-unknown-linux-gnu.tar.gz")
-                || url.ends_with("/v0.0.2/koban-aarch64-unknown-linux-gnu.tar.gz")
+            |url| url.ends_with("/v9.9.9/koban-aarch64-apple-darwin.tar.gz")
+                || url.ends_with("/v9.9.9/koban-x86_64-apple-darwin.tar.gz")
+                || url.ends_with("/v9.9.9/koban-x86_64-unknown-linux-gnu.tar.gz")
+                || url.ends_with("/v9.9.9/koban-aarch64-unknown-linux-gnu.tar.gz")
         ));
         assert!(
             fetches
                 .iter()
-                .any(|url| url.ends_with("/v0.0.2/SHA256SUMS"))
+                .any(|url| url.ends_with("/v9.9.9/SHA256SUMS"))
         );
     }
 
@@ -629,13 +633,15 @@ mod tests {
 
     #[test]
     fn package_managed_installs_return_upgrade_guidance() {
+        // 9.9.9 is an upgrade, so the run reaches install-kind detection (the
+        // Nix-managed guard) instead of stopping at the downgrade guard.
         let ops = FakeOps::new(
-            "v0.0.2",
+            "v9.9.9",
             PathBuf::from("/nix/store/abc-koban/bin/koban"),
             b"unused",
         );
 
-        let error = run_with_ops(&ops, false, false, Some("v0.0.2".to_string()), false)
+        let error = run_with_ops(&ops, false, false, Some("v9.9.9".to_string()), false)
             .expect_err("managed install");
 
         assert!(error.to_string().contains("installed via Nix"), "{error}");

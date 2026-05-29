@@ -49,13 +49,30 @@
 
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
-          src = craneLib.cleanCargoSource ./.;
+          # Cargo sources plus the workflow files and READMEs the test suite and
+          # package metadata reference (code_health_tests reads .github/workflows).
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              (lib.fileset.fileFilter (
+                file:
+                file.hasExt "rs"
+                || file.name == "Cargo.toml"
+                || file.name == "Cargo.lock"
+                || file.name == "README.md"
+              ) ./.)
+              ./.github/workflows
+            ];
+          };
 
-          cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+          # The root manifest is a virtual workspace; crate metadata lives in the
+          # member manifests, and shared fields live under [workspace.package].
+          workspaceToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+          cliToml = builtins.fromTOML (builtins.readFile ./crates/koban-cli/Cargo.toml);
 
           meta = {
-            description = cargoToml.package.description;
-            homepage = cargoToml.package.homepage;
+            description = cliToml.package.description;
+            homepage = workspaceToml.workspace.package.homepage;
             license = lib.licenses.mit;
             mainProgram = "koban";
             maintainers = [
@@ -71,8 +88,8 @@
 
           commonArgs = {
             inherit src;
-            pname = cargoToml.package.name;
-            version = cargoToml.package.version;
+            pname = "koban";
+            version = cliToml.package.version;
             strictDeps = true;
             buildInputs = lib.optionals pkgs.stdenv.isDarwin [
               pkgs.libiconv
@@ -90,6 +107,9 @@
             commonArgs
             // {
               inherit cargoArtifacts;
+              # Build the CLI package; it pulls in the koban library as a
+              # workspace dependency and produces the `koban` binary.
+              cargoExtraArgs = "--package koban-cli";
             }
           );
         in
@@ -266,19 +286,19 @@
                 category = "run";
                 name = "koban";
                 help = "run koban";
-                command = "cargo run -- \"$@\"";
+                command = "cargo run -p koban-cli -- \"$@\"";
               }
               {
                 category = "run";
                 name = "koban-help";
                 help = "show koban help";
-                command = "cargo run -- --help";
+                command = "cargo run -p koban-cli -- --help";
               }
               {
                 category = "run";
                 name = "smoke-statics";
                 help = "safe live GET /api/v1/statics smoke test";
-                command = "cargo run -- statics \"$@\"";
+                command = "cargo run -p koban-cli -- statics \"$@\"";
               }
               {
                 category = "run";
@@ -296,7 +316,7 @@
                   echo "Using Invoice Ninja public demo API: $INVOICE_NINJA_BASE_URL"
 
                   client_id="$(
-                    cargo run -- --output json clients list --per-page 1 \
+                    cargo run -p koban-cli -- --output json clients list --per-page 1 \
                       | jq -r '.data[0].id // empty'
                   )"
                   if [ -z "$client_id" ]; then
@@ -305,7 +325,7 @@
                   fi
 
                   invoice_id="$(
-                    cargo run -- --output json invoices create \
+                    cargo run -p koban-cli -- --output json invoices create \
                       --client-id "$client_id" \
                       --line-item product_key=KobanSmoke,quantity=1,cost=1 \
                       --private-notes "Koban demo write smoke" \
@@ -316,9 +336,9 @@
                     exit 1
                   fi
 
-                  cargo run -- --output json invoices update "$invoice_id" \
+                  cargo run -p koban-cli -- --output json invoices update "$invoice_id" \
                     --private-notes "Koban demo write smoke updated" >/dev/null
-                  cargo run -- --output json invoices delete "$invoice_id" --yes >/dev/null
+                  cargo run -p koban-cli -- --output json invoices delete "$invoice_id" --yes >/dev/null
                   echo "Created, updated, and deleted demo invoice $invoice_id"
                 '';
               }

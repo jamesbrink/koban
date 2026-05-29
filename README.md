@@ -5,10 +5,16 @@ The goal is a small, scriptable tool that feels good for humans at a terminal
 and predictable for AI agents that need stable JSON output, explicit errors, and
 shell completions.
 
-The crate name is claimed on crates.io as `koban` at `0.0.1`. This repository is
-still early work: the CLI boots, reports its version, generates shell
-completions, exposes a broad Invoice Ninja API surface, and includes guarded
-write commands.
+The project is a Cargo workspace with two crates:
+
+- [`koban`](https://crates.io/crates/koban) — the reusable Invoice Ninja API
+  **client library** (`cargo add koban`).
+- [`koban-cli`](https://crates.io/crates/koban-cli) — the **command-line tool**,
+  which installs a `koban` binary (`cargo install koban-cli`).
+
+This repository is still early work: the CLI boots, reports its version,
+generates shell completions, exposes a broad Invoice Ninja API surface, and
+includes guarded write commands.
 
 ## Install
 
@@ -33,7 +39,7 @@ installed version. It uses the same macOS/Linux asset names as release CI and
 Other install paths:
 
 ```sh
-cargo install koban
+cargo install koban-cli
 nix run github:jamesbrink/koban -- --help
 ```
 
@@ -117,6 +123,42 @@ action endpoint with a one-item `ids` list, matching the upstream API shape.
 Endpoint runner payload flags are accepted only for `POST` and `PUT`; `GET` and
 `DELETE` reject payloads so dry-runs cannot show a body that the live request
 would ignore.
+
+## Use as a library
+
+The `koban` crate is a standalone Invoice Ninja API client that other Rust
+applications can depend on:
+
+```sh
+cargo add koban
+```
+
+```rust
+use koban::{ApiClient, Config};
+
+#[tokio::main]
+async fn main() -> koban::Result<()> {
+    // Reads INVOICE_NINJA_API_TOKEN and optional INVOICE_NINJA_BASE_URL.
+    let client = ApiClient::new(Config::from_env()?);
+
+    // Typed resource accessors return the built-in models.
+    for invoice in client.invoices().list().await? {
+        println!("{} -> {}", invoice.number, invoice.balance);
+    }
+
+    // Or work with any resource and your own type / serde_json::Value.
+    let client_record = client.clients().get("client_id").await?;
+    println!("{}", client_record.display_name);
+
+    Ok(())
+}
+```
+
+The typed models (`Invoice`, `Client`, `Payment`, ...) are forward-compatible:
+unknown fields are preserved in an `extra` map, and the raw JSON methods
+(`client.get_json(...)`, `post_json`, ...) remain available as a low-level escape
+hatch. The library depends only on `thiserror` for its error type by default;
+enable the `miette` feature for diagnostic help text on `KobanError`.
 
 ## Invoice Ninja Direction
 
@@ -279,7 +321,7 @@ run-tests       cargo test
 ci-local        run the Rust-side CI sequence
 code-health     check Rust source files against module size budgets
 coverage        cargo llvm-cov summary, or --html for a report
-koban           cargo run -- ...
+koban           cargo run -p koban-cli -- ...
 koban-help      show koban help
 smoke-statics   safe live GET /api/v1/statics smoke test
 smoke-invoice-write-demo  explicit demo-only invoice create/update/delete smoke test
@@ -315,9 +357,12 @@ both x86_64 and aarch64.
 
 ## Releases
 
-Releases are managed by release-please. When a release is cut, CI builds
-unsigned CLI tarballs for macOS and Linux, uploads `SHA256SUMS`, and publishes
-the crate to crates.io using `CARGO_REGISTRY_TOKEN`.
+Releases are managed by release-please across the workspace, keeping the `koban`
+library and `koban-cli` binary crates on a single linked version. When a release
+is cut, CI builds unsigned CLI tarballs for macOS and Linux, uploads
+`SHA256SUMS`, and publishes both crates to crates.io (library first, then the
+CLI) using `CARGO_REGISTRY_TOKEN`. The binary release keeps the prefix-free
+`vX.Y.Z` tag that `install.sh` and `koban update` rely on.
 
 The nightly workflow builds the current `main` branch into a rolling
 `nightly` prerelease. It uses a `nightly-staging` release while compiling so

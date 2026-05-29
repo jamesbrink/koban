@@ -23,17 +23,19 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
-      releases_created: ${{ steps.release.outputs.releases_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      # The koban-cli component owns the prefix-free `vX.Y.Z` tag that carries the
+      # binary assets (install.sh and `koban update` depend on this tag scheme).
+      releases_created: ${{ steps.release.outputs['crates/koban-cli--release_created'] }}
+      tag_name: ${{ steps.release.outputs['crates/koban-cli--tag_name'] }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
 
       - name: Mark release as draft
-        if: steps.release.outputs.releases_created == 'true'
+        if: steps.release.outputs['crates/koban-cli--release_created'] == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ steps.release.outputs.tag_name }}" --draft --repo "${{ github.repository }}"
+        run: gh release edit "${{ steps.release.outputs['crates/koban-cli--tag_name'] }}" --draft --repo "${{ github.repository }}"
 
   resolve-tag:
     name: Resolve Tag
@@ -162,6 +164,11 @@ jobs:
         if: env.CARGO_REGISTRY_TOKEN == ''
         run: echo "CARGO_REGISTRY_TOKEN is not configured; skipping crates.io publish."
 
-      - name: Publish crate
+      - name: Publish crates
         if: env.CARGO_REGISTRY_TOKEN != ''
-        run: cargo publish --locked
+        # Publish the library first; koban-cli depends on it, so it must already
+        # be available on crates.io before the CLI publish resolves.
+        run: |
+          set -euo pipefail
+          cargo publish --locked -p koban
+          cargo publish --locked -p koban-cli

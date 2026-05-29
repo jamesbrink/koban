@@ -1,11 +1,24 @@
-use clap::Parser;
+mod cli;
+mod commands;
+mod invoice;
+mod payload;
+mod render;
+mod update;
+
+use clap::{CommandFactory, Parser};
 use clap_complete::{Shell, generate};
 use clap_complete_nushell::Nushell;
-use koban::{Cli, Commands, CompletionShell};
+
+use cli::{Cli, Commands, CompletionShell};
+
+/// Build the clap command tree for the CLI (used for shell completions).
+fn command() -> clap::Command {
+    Cli::command()
+}
 
 #[tokio::main]
 async fn main() {
-    clap_complete::CompleteEnv::with_factory(koban::command).complete();
+    clap_complete::CompleteEnv::with_factory(command).complete();
 
     let cli = Cli::parse();
 
@@ -14,7 +27,7 @@ async fn main() {
         return;
     }
 
-    match koban::execute(cli).await {
+    match commands::execute(cli).await {
         Ok(output) if output.is_empty() => {}
         Ok(output) => println!("{output}"),
         Err(error) => {
@@ -25,7 +38,7 @@ async fn main() {
 }
 
 fn print_completions(shell: &CompletionShell) {
-    let mut command = koban::command();
+    let mut command = command();
     let bin_name = command.get_name().to_string();
 
     match shell {
@@ -57,3 +70,6 @@ fn print_completions(shell: &CompletionShell) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

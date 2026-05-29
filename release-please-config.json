@@ -1,5 +1,4 @@
 {
-  "release-type": "rust",
   "bump-minor-pre-major": true,
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
@@ -12,9 +11,24 @@
     { "type": "build", "section": "Build", "hidden": true },
     { "type": "ci", "section": "CI", "hidden": true }
   ],
+  "plugins": [
+    "cargo-workspace",
+    {
+      "type": "linked-versions",
+      "groupName": "koban",
+      "components": ["koban", "koban-cli"]
+    }
+  ],
   "packages": {
-    ".": {
+    "crates/koban": {
+      "release-type": "rust",
       "package-name": "koban",
+      "component": "koban"
+    },
+    "crates/koban-cli": {
+      "release-type": "rust",
+      "package-name": "koban-cli",
+      "component": "koban-cli",
       "include-component-in-tag": false
     }
   }

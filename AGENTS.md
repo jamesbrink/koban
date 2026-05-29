@@ -19,8 +19,17 @@ The `main` branch is protected. Use pull requests for changes and keep the
 required CI contexts green: `fmt`, `check`, `clippy`, `test`, and `build`.
 Resolve review conversations before merging.
 
-Koban is an early Rust CLI for Invoice Ninja. The implemented API surface spans
-the official resource families with guarded write commands:
+Koban is a Cargo workspace with two crates: `crates/koban` is the publishable
+Invoice Ninja API client library (`ApiClient`, `Config`, `Resource`, typed
+`models`, errors), and `crates/koban-cli` is the CLI. The CLI package is
+`koban-cli` but produces a binary named `koban` (via `[[bin]] name = "koban"`),
+so release assets, `install.sh`, and `koban update` keep using `koban`. The
+library keeps `miette` behind an optional feature (the CLI enables it); CLI-only
+input parsing (clap structs, payload/invoice/render/update) stays in `koban-cli`.
+Run `cargo run -p koban-cli -- ...` from the workspace root.
+
+The implemented API surface spans the official resource families with guarded
+write commands:
 
 - Prefer the public Invoice Ninja demo endpoint for live smoke tests:
   `INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com` and
@@ -48,13 +57,16 @@ the gitignored `.env` file when those variables are not already set.
 Mutating smoke helpers must hard-code the public demo API internally so they
 cannot inherit a production or personal endpoint.
 
-Release automation lives in `.github/workflows/release-please.yml`. Koban is a
-plain CLI: do not add code signing or notarization unless explicitly requested.
-Release assets must stay in sync with `koban update` asset names and
+Release automation lives in `.github/workflows/release-please.yml`. release-please
+runs in workspace mode (`cargo-workspace` + `linked-versions` plugins) keeping
+`koban` and `koban-cli` on one linked version; the `koban-cli` component owns the
+prefix-free `vX.Y.Z` tag that carries the binary assets, while the library uses a
+`koban-v*` tag. Do not add code signing or notarization unless explicitly
+requested. Release assets must stay in sync with `koban update` asset names and
 `install.sh`, and each release must publish `SHA256SUMS`. crates.io publishing
-must remain gated on `CARGO_REGISTRY_TOKEN`. Repository Actions workflow
-permissions must allow read/write tokens and GitHub Actions PR creation so
-release-please can open release PRs.
+must remain gated on `CARGO_REGISTRY_TOKEN`, publishing the `koban` library
+before `koban-cli`. Repository Actions workflow permissions must allow read/write
+tokens and GitHub Actions PR creation so release-please can open release PRs.
 
 Nightly automation lives in `.github/workflows/nightly.yml`. It builds current
 `main` into a rolling `nightly` prerelease through `nightly-staging`, then
