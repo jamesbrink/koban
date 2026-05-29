@@ -410,23 +410,28 @@ The documentation website lives in `website/` (VitePress) and is published to
 GitHub Pages at <https://jamesbrink.online/koban/> by
 `.github/workflows/pages.yml` on pushes to `main` that touch `website/`.
 
-The devshell also loads `INVOICE_NINJA_API_TOKEN` and
-`INVOICE_NINJA_BASE_URL` from a local gitignored `.env` file when those
-variables are not already set in the shell. For routine live smoke testing, use
-the demo values:
+To keep this repo safe for AI agents, the devshell **forces koban to the public
+demo endpoint by default**: it exports the demo `INVOICE_NINJA_BASE_URL` /
+`INVOICE_NINJA_API_TOKEN` (overriding any `.env` or inherited values) and points
+`KOBAN_CONFIG_DIR` at a gitignored repo-local `.koban/`, so a stored
+`koban auth login` credential is never resolved here. An agent loading the koban
+skill can only reach the demo account.
+
+To use live credentials for an intentional check, enter the shell with
+`KOBAN_ALLOW_LIVE=1`:
+
+```sh
+KOBAN_ALLOW_LIVE=1 nix develop
+```
+
+Under `KOBAN_ALLOW_LIVE=1`, `INVOICE_NINJA_API_TOKEN` and
+`INVOICE_NINJA_BASE_URL` are loaded from a local gitignored `.env` file when not
+already set in the shell, and the stored credential is reachable:
 
 ```dotenv
 INVOICE_NINJA_API_TOKEN=TOKEN
 INVOICE_NINJA_BASE_URL=https://demo.invoiceninja.com
 ```
-
-To keep this repo safe for AI agents, the devshell then **pins koban to the
-public demo endpoint**: it defaults the two variables above to the demo when
-unset and points `KOBAN_CONFIG_DIR` at a gitignored repo-local `.koban/`, so a
-stored `koban auth login` credential is never resolved in the devshell. An agent
-loading the koban skill here can only reach the demo account. For an intentional
-real-account read, export `INVOICE_NINJA_*` yourself (env always wins) or point
-`KOBAN_CONFIG_DIR` at your real config.
 
 The demo write smoke helpers are intentionally opt-in and hard-code the public
 demo API internally so they cannot inherit a production or personal endpoint:
