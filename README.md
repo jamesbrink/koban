@@ -111,6 +111,8 @@ koban skill generate                       # write to ./koban-skills for review
 koban skill install --target claude-code   # into ./.claude/skills/koban
 koban skill install --global --target all  # into ~/.claude, ~/.agents, AGENTS.md
 koban skill install --target openclaw       # into ./skills/koban (OpenClaw workspace)
+# OpenClaw users can also install straight from Git:
+#   openclaw skills install git:jamesbrink/koban
 koban skill install --target claude-desktop # build koban.zip to upload
 ```
 

@@ -59,6 +59,16 @@ workspace `skills/koban/SKILL.md` (or `~/.openclaw/skills/koban/SKILL.md` with
 (`requires.bins: ["koban"]`), so OpenClaw only loads the skill when the `koban`
 binary is on `PATH`. It stays opt-in — `--target all` does not include it.
 
+A canonical copy is checked into the koban repo at `skills/koban/SKILL.md`, so
+OpenClaw users can install it straight from Git without cloning:
+
+```sh
+openclaw skills install git:jamesbrink/koban
+```
+
+CI regenerates that file and fails if it drifts from the generator, so the
+committed copy always matches `koban skill generate --target openclaw`.
+
 ## AGENTS.md is idempotent
 
 The `agents-md` target splices a marked block into an existing `AGENTS.md`
