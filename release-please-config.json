@@ -1,5 +1,6 @@
 {
   "bump-minor-pre-major": true,
+  "group-pull-request-title-pattern": "chore: release ${version}",
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },
@@ -12,7 +13,10 @@
     { "type": "ci", "section": "CI", "hidden": true }
   ],
   "plugins": [
-    "cargo-workspace",
+    {
+      "type": "cargo-workspace",
+      "merge": false
+    },
     {
       "type": "linked-versions",
       "groupName": "koban",
