@@ -222,8 +222,20 @@ jobs:
                 return 0
               fi
 
-              if cargo publish --locked -p "$package"; then
+              # Capture output so a crate already on crates.io (e.g. the
+              # unchanged library at its current version) is treated as
+              # published rather than a fatal error that blocks the dependent
+              # CLI publish. `crate_is_published` (cargo search) only sees the
+              # latest version, so it can miss an already-published version and
+              # let us reach `cargo publish`; this is the authoritative guard.
+              if output="$(cargo publish --locked -p "$package" 2>&1)"; then
+                echo "$output"
                 echo "Published $package $version."
+                return 0
+              fi
+              echo "$output"
+              if printf '%s\n' "$output" | grep -q "already exists on crates.io"; then
+                echo "$package $version already exists on crates.io; nothing to do."
                 return 0
               fi
 
