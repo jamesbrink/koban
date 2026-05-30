@@ -8,9 +8,9 @@ on:
       - ".github/copilot-instructions.md"
       - ".github/instructions/**"
       - ".github/workflows/ci.yml"
-      - ".github/workflows/release-please.yml"
+      - ".github/workflows/release-plz.yml"
       - ".github/workflows/pages.yml"
-      - ".release-please-manifest.json"
+      - "release-plz.toml"
       - "CHANGELOG.md"
       - "website/**"
   workflow_dispatch: {}

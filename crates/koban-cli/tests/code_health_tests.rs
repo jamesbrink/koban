@@ -39,26 +39,28 @@ fn ci_keeps_coverage_gate_enforced() {
 }
 
 #[test]
-fn release_publish_crate_is_gated_on_registry_token() {
-    let workflow =
-        fs::read_to_string(workspace_root().join(".github/workflows/release-please.yml"))
-            .expect("read release workflow");
+fn release_crate_publish_is_wired_to_registry_token() {
+    let workflow = fs::read_to_string(workspace_root().join(".github/workflows/release-plz.yml"))
+        .expect("read release workflow");
 
     assert!(
         !workflow.contains("secrets.CARGO_REGISTRY_TOKEN != ''"),
         "GitHub Actions does not support secrets directly in if conditionals"
     );
     assert!(
+        workflow.contains("CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}"),
+        "release-plz must receive CARGO_REGISTRY_TOKEN to publish crates to crates.io"
+    );
+    assert!(
         workflow.contains("if: env.CARGO_REGISTRY_TOKEN != ''"),
-        "crates.io publish step must be explicitly gated on CARGO_REGISTRY_TOKEN"
+        "the release step must stay gated on CARGO_REGISTRY_TOKEN so it skips cleanly when the token is absent"
     );
 }
 
 #[test]
 fn release_workflow_supports_first_release_dispatch() {
-    let workflow =
-        fs::read_to_string(workspace_root().join(".github/workflows/release-please.yml"))
-            .expect("read release workflow");
+    let workflow = fs::read_to_string(workspace_root().join(".github/workflows/release-plz.yml"))
+        .expect("read release workflow");
 
     assert!(
         workflow.contains("description: \"Release tag to build and publish"),
@@ -75,22 +77,31 @@ fn release_workflow_supports_first_release_dispatch() {
 }
 
 #[test]
-fn release_publish_waits_for_library_before_cli_crate() {
-    let workflow =
-        fs::read_to_string(workspace_root().join(".github/workflows/release-please.yml"))
-            .expect("read release workflow");
+fn release_plz_publishes_both_crates_with_stable_tag_scheme() {
+    let workflow = fs::read_to_string(workspace_root().join(".github/workflows/release-plz.yml"))
+        .expect("read release workflow");
+    // release-plz drives crates.io publishing (library before CLI, ordered
+    // automatically) and opens the release PR.
+    assert!(
+        workflow.contains("command: release-pr"),
+        "release-plz must open the release PR"
+    );
+    assert!(
+        workflow.contains("command: release\n"),
+        "release-plz must run the release command to publish crates and create tags"
+    );
 
+    let config = fs::read_to_string(workspace_root().join("release-plz.toml"))
+        .expect("read release-plz config");
+    // install.sh and `koban update` depend on the prefix-free CLI tag carrying
+    // the binaries, and the library on the `koban-v*` tag — protect that contract.
     assert!(
-        workflow.contains("for attempt in 1 2 3 4 5 6"),
-        "CLI crate publish should retry while crates.io indexes the freshly published library"
+        config.contains("name = \"koban-cli\"\ngit_tag_name = \"v{{ version }}\""),
+        "koban-cli must own the prefix-free vX.Y.Z tag that carries binary assets"
     );
     assert!(
-        workflow.contains("cargo search koban --limit 1"),
-        "CLI crate publish should refresh the crates.io index between publish attempts"
-    );
-    assert!(
-        workflow.contains("publish_with_retry koban-cli"),
-        "release workflow must still publish the CLI crate"
+        config.contains("name = \"koban\"\ngit_tag_name = \"koban-v{{ version }}\""),
+        "the koban library must use the koban-v* tag"
     );
 }
 
