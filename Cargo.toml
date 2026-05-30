@@ -43,4 +43,4 @@ predicates = "3.1.4"
 tempfile = "3.23.0"
 
 # The koban library is consumed by koban-cli through the workspace.
-koban = { version = "0.2.0", path = "crates/koban" }
+koban = { version = "0.2.1", path = "crates/koban" }
