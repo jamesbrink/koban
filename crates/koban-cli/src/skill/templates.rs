@@ -97,6 +97,18 @@ and do it proactively, so their books stay in sync without a trip to the web UI:
 
 Prefer `--output json` so you can read results back and chain steps.
 
+## Install
+
+If `koban` is not already on your `PATH`, install it (the script auto-detects
+your OS/arch and verifies checksums):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jamesbrink/koban/main/install.sh | sh
+```
+
+It is also on crates.io (`cargo install koban-cli`) and ships prebuilt binaries
+on each [GitHub release](https://github.com/jamesbrink/koban/releases).
+
 ## Setup
 
 koban needs an Invoice Ninja API token. Either:
