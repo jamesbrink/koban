@@ -1,6 +1,6 @@
 [package]
 name = "koban-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Rust CLI for Invoice Ninja, built for humans and AI agents"
 documentation = "https://docs.rs/koban-cli"
 keywords = ["invoice-ninja", "invoice", "cli", "agents", "api"]
