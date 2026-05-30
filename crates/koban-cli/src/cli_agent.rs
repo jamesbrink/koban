@@ -94,6 +94,9 @@ pub enum SkillTarget {
     ClaudeDesktop,
     /// Cursor project rule (`.cursor/rules/koban.mdc`)
     Cursor,
+    /// OpenClaw skill (`skills/koban/SKILL.md`, or `~/.openclaw/skills/...`)
+    #[value(name = "openclaw", alias = "open-claw")]
+    OpenClaw,
     /// Claude Code plugin (`.claude-plugin/plugin.json` + skill)
     Plugin,
     /// claude-code + codex + agents-md (the practical default bundle)

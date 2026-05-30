@@ -83,8 +83,8 @@ works, instead of you context-switching to the web UI. The skill teaches the
 agent koban's stable JSON output and its `--dry-run`/`--yes` safety gates, so
 every write is previewed before it happens.
 
-Supported harnesses include Claude Code, OpenAI Codex CLI, pi, Cursor, Claude
-Desktop, and any tool that reads `AGENTS.md` (Windsurf, Gemini CLI, Aider,
+Supported harnesses include Claude Code, OpenAI Codex CLI, pi, Cursor, OpenClaw,
+Claude Desktop, and any tool that reads `AGENTS.md` (Windsurf, Gemini CLI, Aider,
 Copilot, Zed, …). See the
 [agent skill docs](https://jamesbrink.online/koban/commands/skill).
 
@@ -110,6 +110,7 @@ koban auth logout
 koban skill generate                       # write to ./koban-skills for review
 koban skill install --target claude-code   # into ./.claude/skills/koban
 koban skill install --global --target all  # into ~/.claude, ~/.agents, AGENTS.md
+koban skill install --target openclaw       # into ./skills/koban (OpenClaw workspace)
 koban skill install --target claude-desktop # build koban.zip to upload
 ```
 

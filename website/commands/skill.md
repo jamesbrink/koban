@@ -30,25 +30,34 @@ config with `--global`.
 `--target` is repeatable and defaults to `all`
 (`claude-code` + `codex` + `agents-md`).
 
-| Target           | Output                                | Covers                                              |
-| ---------------- | ------------------------------------- | --------------------------------------------------- |
-| `claude-code`    | `.claude/skills/koban/SKILL.md`       | Claude Code                                         |
-| `codex`          | `.agents/skills/koban/SKILL.md`       | OpenAI Codex CLI                                    |
-| `pi`             | `.pi/skills/koban/SKILL.md`           | pi coding agent (native location)                   |
-| `agents-md`      | `AGENTS.md` block                     | Cursor, Windsurf, Gemini CLI, Aider, Copilot, Zed … |
-| `claude-desktop` | `koban.zip`                           | Claude Desktop (upload via Settings)                |
-| `cursor`         | `.cursor/rules/koban.mdc`             | Cursor (project rule)                               |
-| `plugin`         | `koban/.claude-plugin/plugin.json`    | Claude Code plugin bundle                           |
-| `all`            | `claude-code` + `codex` + `agents-md` | the practical default bundle                        |
+| Target           | Output                                | Covers                                                |
+| ---------------- | ------------------------------------- | ----------------------------------------------------- |
+| `claude-code`    | `.claude/skills/koban/SKILL.md`       | Claude Code                                           |
+| `codex`          | `.agents/skills/koban/SKILL.md`       | OpenAI Codex CLI                                      |
+| `pi`             | `.pi/skills/koban/SKILL.md`           | pi coding agent (native location)                     |
+| `agents-md`      | `AGENTS.md` block                     | Cursor, Windsurf, Gemini CLI, Aider, Copilot, Zed …   |
+| `claude-desktop` | `koban.zip`                           | Claude Desktop (upload via Settings)                  |
+| `cursor`         | `.cursor/rules/koban.mdc`             | Cursor (project rule)                                 |
+| `openclaw`       | `skills/koban/SKILL.md`               | OpenClaw (workspace skill, gated on the koban binary) |
+| `plugin`         | `koban/.claude-plugin/plugin.json`    | Claude Code plugin bundle                             |
+| `all`            | `claude-code` + `codex` + `agents-md` | the practical default bundle                          |
 
 The `.agents/skills/` directory written by the `codex` target is also read by
 pi, so most pi setups are already covered by `codex`. Use the dedicated `pi`
 target only when you want the skill in pi's native `.pi/skills/` location.
 
 With `--global`, file targets install into `~/.claude`, `~/.agents`,
-`~/.pi/agent`, and `~/.codex/AGENTS.md`. The `claude-desktop` zip and `plugin`
-bundle are project artifacts and are written to the output directory regardless
-of `--global`.
+`~/.pi/agent`, `~/.codex/AGENTS.md`, and `~/.openclaw/skills` (OpenClaw's shared
+location). The `claude-desktop` zip and `plugin` bundle are project artifacts and
+are written to the output directory regardless of `--global`.
+
+## OpenClaw
+
+`--target openclaw` writes an [OpenClaw](https://openclaw.ai) skill to the
+workspace `skills/koban/SKILL.md` (or `~/.openclaw/skills/koban/SKILL.md` with
+`--global`). Its frontmatter carries a single-line `metadata` gate
+(`requires.bins: ["koban"]`), so OpenClaw only loads the skill when the `koban`
+binary is on `PATH`. It stays opt-in — `--target all` does not include it.
 
 ## AGENTS.md is idempotent
 

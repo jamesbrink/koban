@@ -57,8 +57,9 @@ write commands:
   feature in `koban-cli`.
 - `koban skill generate`/`install` emit the agent skill. Keep one shared body in
   `skill/templates.rs` with target-correct frontmatter per kind (Claude Code,
-  Codex, pi, Cursor `.mdc`, plugin JSON, and a marker-wrapped `AGENTS.md` block).
-  `--target all` = `claude-code` + `codex` + `agents-md`.
+  Codex, pi, Cursor `.mdc`, OpenClaw `SKILL.md` with a single-line `metadata`
+  gate, plugin JSON, and a marker-wrapped `AGENTS.md` block). `--target all` =
+  `claude-code` + `codex` + `agents-md`; `openclaw` stays opt-in.
 - Redact tokens in errors, traces, fixtures, and docs.
 - Preserve stable JSON output for agents alongside useful table output for
   humans.

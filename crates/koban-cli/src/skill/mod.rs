@@ -138,6 +138,15 @@ fn plan_target(
                 content: Content::Text(templates::cursor_mdc(command_list)),
             }])
         }
+        SkillTarget::OpenClaw => {
+            // Workspace skills live at `<workspace>/skills` (no dot-prefix);
+            // the shared/global location is `~/.openclaw/skills`.
+            let base = base_dir(mode, args, "", ".openclaw")?;
+            Ok(vec![Artifact {
+                path: base.join("skills").join("koban").join("SKILL.md"),
+                content: Content::Text(templates::skill_md(Flavor::OpenClaw, command_list)),
+            }])
+        }
         SkillTarget::ClaudeDesktop => {
             // The upload bundle and the plugin are project artifacts; --global
             // does not relocate them.

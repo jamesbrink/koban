@@ -234,3 +234,47 @@ fn install_does_not_print_the_generate_hint() {
         .success()
         .stdout(predicate::str::contains("koban skill install").not());
 }
+
+#[test]
+fn generate_openclaw_emits_workspace_skill_with_single_line_metadata_gate() {
+    let dir = tempdir().expect("tempdir");
+    koban()
+        .args(["skill", "generate", "--target", "openclaw", "--dir"])
+        .arg(dir.path())
+        .assert()
+        .success();
+
+    // OpenClaw workspace layout: <root>/skills/koban/SKILL.md (no dot-prefix).
+    let skill =
+        std::fs::read_to_string(dir.path().join("skills/koban/SKILL.md")).expect("openclaw skill");
+    assert!(skill.starts_with("---\n"));
+    assert!(skill.contains("name: koban"));
+    assert!(skill.contains("description: Read and write Invoice Ninja"));
+
+    // OpenClaw's parser only accepts single-line frontmatter keys, so the
+    // metadata gate must be a single-line JSON object, and it must gate on the
+    // koban binary being present on PATH.
+    let metadata_line = skill
+        .lines()
+        .find(|line| line.starts_with("metadata:"))
+        .expect("single-line metadata key");
+    assert!(metadata_line.contains("\"openclaw\""));
+    assert!(metadata_line.contains("\"bins\""));
+    assert!(metadata_line.contains("\"koban\""));
+
+    // It is a SKILL.md flavor, not a Claude Code one: no allowed-tools key.
+    assert!(!skill.contains("allowed-tools"));
+}
+
+#[test]
+fn target_all_excludes_openclaw() {
+    let dir = tempdir().expect("tempdir");
+    // OpenClaw stays opt-in; `all` keeps its documented three-target contract.
+    koban()
+        .args(["skill", "generate", "--target", "all", "--dir"])
+        .arg(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3 file(s)"));
+    assert!(!dir.path().join("skills/koban/SKILL.md").exists());
+}
