@@ -29,6 +29,12 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo check
       - run: scripts/check-code-health.sh
+      # The committed OpenClaw skill (for `openclaw skills install git:...`) is a
+      # generated artifact; regenerate it in place and fail if it drifted.
+      - name: OpenClaw skill is in sync with the generator
+        run: |
+          cargo run -p koban-cli -- skill generate --target openclaw --dir . --force
+          git diff --exit-code skills/koban/SKILL.md
 
   clippy:
     runs-on: ubuntu-latest

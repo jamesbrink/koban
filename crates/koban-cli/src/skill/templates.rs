@@ -3,6 +3,7 @@
 //! One shared skill body is wrapped in target-specific frontmatter so each
 //! harness receives a header it actually understands:
 //! - Claude Code / Codex / pi: `SKILL.md` (YAML frontmatter + markdown)
+//! - OpenClaw: `SKILL.md` with a single-line `metadata` JSON load-time gate
 //! - Cursor: `.mdc` (its own `description`/`globs`/`alwaysApply` frontmatter)
 //! - Claude Code plugin: `plugin.json` (JSON manifest, no frontmatter)
 //! - AGENTS.md: plain markdown, no frontmatter, wrapped in idempotency markers
@@ -25,6 +26,26 @@ pub(crate) enum Flavor {
     Codex,
     /// pi coding agent: Agent Skills subset plus `allowed-tools`.
     Pi,
+    /// OpenClaw: single-line frontmatter keys; a single-line `metadata` JSON
+    /// object carries the `openclaw` load-time gate.
+    OpenClaw,
+}
+
+/// The OpenClaw load-time gate, as a single-line JSON object for the
+/// `metadata:` frontmatter key. The skill only loads when `koban` is on PATH.
+///
+/// OpenClaw's frontmatter parser accepts single-line keys only, so this must
+/// stay on one line (do not pretty-print it).
+pub(crate) fn openclaw_metadata() -> String {
+    // `serde_json::to_string` (compact, no newlines) keeps the single-line
+    // contract even if the gate grows more fields later.
+    let gate = serde_json::json!({
+        "openclaw": {
+            "emoji": "🧾",
+            "requires": { "bins": ["koban"] },
+        }
+    });
+    serde_json::to_string(&gate).unwrap_or_default()
 }
 
 /// The skill `description` — answers "what" and "when", with no XML tags and no
@@ -179,6 +200,14 @@ pub(crate) fn skill_md(flavor: Flavor, command_list: &str) -> String {
         Flavor::Pi => format!(
             "---\nname: koban\ndescription: {description}\nallowed-tools: Bash(koban:*)\nlicense: MIT\n---\n"
         ),
+        Flavor::OpenClaw => {
+            // OpenClaw's parser accepts single-line frontmatter keys only, and
+            // `metadata` must stay a single-line JSON object (see
+            // `openclaw_metadata`). The `metadata` gate hides the skill unless
+            // `koban` is on PATH, so no `allowed-tools` scope is emitted.
+            let metadata = openclaw_metadata();
+            format!("---\nname: koban\ndescription: {description}\nmetadata: {metadata}\n---\n")
+        }
     };
     format!("{frontmatter}\n{}", body(command_list))
 }
