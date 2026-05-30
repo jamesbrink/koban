@@ -278,3 +278,32 @@ fn target_all_excludes_openclaw() {
         .stdout(predicate::str::contains("3 file(s)"));
     assert!(!dir.path().join("skills/koban/SKILL.md").exists());
 }
+
+#[test]
+fn install_openclaw_routes_to_workspace_and_global_paths() {
+    // Project install lands in the workspace `skills/` (no dot-prefix); the
+    // `--global` install lands under `~/.openclaw/skills` — exercised here via
+    // the `--dir` root override so the test never touches a real home dir.
+    let project = tempdir().expect("tempdir");
+    koban()
+        .args(["skill", "install", "--target", "openclaw", "--dir"])
+        .arg(project.path())
+        .assert()
+        .success();
+    assert!(project.path().join("skills/koban/SKILL.md").exists());
+
+    let global = tempdir().expect("tempdir");
+    koban()
+        .args([
+            "skill", "install", "--global", "--target", "openclaw", "--dir",
+        ])
+        .arg(global.path())
+        .assert()
+        .success();
+    assert!(
+        global
+            .path()
+            .join(".openclaw/skills/koban/SKILL.md")
+            .exists()
+    );
+}

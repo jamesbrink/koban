@@ -39,13 +39,13 @@ pub(crate) enum Flavor {
 pub(crate) fn openclaw_metadata() -> String {
     // `serde_json::to_string` (compact, no newlines) keeps the single-line
     // contract even if the gate grows more fields later.
-    serde_json::json!({
+    let gate = serde_json::json!({
         "openclaw": {
             "emoji": "🧾",
             "requires": { "bins": ["koban"] },
         }
-    })
-    .to_string()
+    });
+    serde_json::to_string(&gate).unwrap_or_default()
 }
 
 /// The skill `description` — answers "what" and "when", with no XML tags and no
