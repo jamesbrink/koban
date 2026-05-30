@@ -83,7 +83,7 @@ fn release_plz_publishes_both_crates_with_stable_tag_scheme() {
         "release-plz must open the release PR"
     );
     assert!(
-        workflow.contains("command: release"),
+        workflow.contains("command: release\n"),
         "release-plz must run the release command to publish crates and create tags"
     );
 
@@ -92,13 +92,11 @@ fn release_plz_publishes_both_crates_with_stable_tag_scheme() {
     // install.sh and `koban update` depend on the prefix-free CLI tag carrying
     // the binaries, and the library on the `koban-v*` tag — protect that contract.
     assert!(
-        config.contains("name = \"koban-cli\"")
-            && config.contains("git_tag_name = \"v{{ version }}\""),
+        config.contains("name = \"koban-cli\"\ngit_tag_name = \"v{{ version }}\""),
         "koban-cli must own the prefix-free vX.Y.Z tag that carries binary assets"
     );
     assert!(
-        config.contains("name = \"koban\"")
-            && config.contains("git_tag_name = \"koban-v{{ version }}\""),
+        config.contains("name = \"koban\"\ngit_tag_name = \"koban-v{{ version }}\""),
         "the koban library must use the koban-v* tag"
     );
 }
