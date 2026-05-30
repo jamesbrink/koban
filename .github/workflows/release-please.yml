@@ -30,6 +30,13 @@ jobs:
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
+        with:
+          # The default GITHUB_TOKEN cannot trigger other workflows, so CI
+          # (on: pull_request) never runs on release-please's PRs and the
+          # required checks sit "Expected — waiting" forever. A PAT (or App
+          # token) in RELEASE_PLEASE_TOKEN makes the PR trigger CI normally;
+          # falls back to GITHUB_TOKEN when the secret is unset (no breakage).
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
       - name: Mark release as draft
         if: steps.release.outputs['crates/koban-cli--release_created'] == 'true'
