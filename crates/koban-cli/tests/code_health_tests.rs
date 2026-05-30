@@ -51,6 +51,10 @@ fn release_crate_publish_is_wired_to_registry_token() {
         workflow.contains("CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}"),
         "release-plz must receive CARGO_REGISTRY_TOKEN to publish crates to crates.io"
     );
+    assert!(
+        workflow.contains("if: env.CARGO_REGISTRY_TOKEN != ''"),
+        "the release step must stay gated on CARGO_REGISTRY_TOKEN so it skips cleanly when the token is absent"
+    );
 }
 
 #[test]
