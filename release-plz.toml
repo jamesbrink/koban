@@ -1,0 +1,44 @@
+# Release automation for koban — driven by release-plz.
+# https://release-plz.dev/docs/config
+#
+# release-plz owns the release PR (with the correct version — the thing the old
+# release-please virtual-workspace setup could not populate), per-package git
+# tags, and crates.io publishing (library before CLI, ordered automatically).
+# It does NOT build the cross-platform binaries; the dedicated build/publish-
+# release jobs in `.github/workflows/release-plz.yml` own the single `vX.Y.Z`
+# GitHub release that carries the tarballs + SHA256SUMS.
+
+[workspace]
+# The build job creates the GitHub release (draft -> upload assets -> publish),
+# so release-plz must not create one itself. It still creates the git tags
+# (git_tag_enable defaults to true) and publishes to crates.io.
+git_release_enable = false
+
+[changelog]
+# Mirror the section visibility of the former release-please config: only
+# feat / fix / perf / refactor are shown; docs / chore / test / build / ci are
+# hidden. The `<!-- N -->` prefixes order the sections and are stripped on
+# render. These parsers affect changelog text only, not version-bump detection.
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance Improvements" },
+  { message = "^refactor", group = "<!-- 3 -->Refactors" },
+  { message = "^docs", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^test", skip = true },
+  { message = "^build", skip = true },
+  { message = "^ci", skip = true },
+]
+
+# Independent versions: each crate bumps only when its own code changes (no
+# version_group). The CLI owns the prefix-free `vX.Y.Z` tag that carries the
+# binary assets; the library uses a `koban-v*` tag. install.sh and
+# `koban update` depend on the prefix-free CLI tag scheme.
+[[package]]
+name = "koban"
+git_tag_name = "koban-v{{ version }}"
+
+[[package]]
+name = "koban-cli"
+git_tag_name = "v{{ version }}"

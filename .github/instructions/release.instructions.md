@@ -1,5 +1,5 @@
 ---
-applyTo: "install.sh,README.md,AGENTS.md,CLAUDE.md,.github/workflows/*.yml,release-please-config.json,.release-please-manifest.json,flake.nix"
+applyTo: "install.sh,README.md,AGENTS.md,CLAUDE.md,.github/workflows/*.yml,release-plz.toml,flake.nix"
 ---
 
 Keep release assets aligned across release CI, `install.sh`, and

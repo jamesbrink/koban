@@ -89,16 +89,26 @@ sync. Docs-only changes are excluded from the nightly build via `paths-ignore`.
 Mutating smoke helpers must hard-code the public demo API internally so they
 cannot inherit a production or personal endpoint.
 
-Release automation lives in `.github/workflows/release-please.yml`. release-please
-runs in workspace mode (`cargo-workspace` + `linked-versions` plugins) keeping
-`koban` and `koban-cli` on one linked version; the `koban-cli` component owns the
-prefix-free `vX.Y.Z` tag that carries the binary assets, while the library uses a
-`koban-v*` tag. Do not add code signing or notarization unless explicitly
-requested. Release assets must stay in sync with `koban update` asset names and
+Release automation lives in `.github/workflows/release-plz.yml`, configured by
+`release-plz.toml`. [release-plz](https://release-plz.dev) is workspace-aware: it
+opens the release PR (with the correct version), creates the per-package git
+tags, and publishes to crates.io in dependency order (the `koban` library before
+`koban-cli`). The two crates version **independently** — each bumps only when its
+own code changes (no `version_group`). The `koban-cli` crate owns the prefix-free
+`vX.Y.Z` tag that carries the binary assets; the library uses a `koban-v*` tag.
+release-plz does not build binaries: the `build`/`publish-release` jobs in the
+same workflow create the single `vX.Y.Z` GitHub release (draft → upload →
+publish) after release-plz tags a CLI release, gated on its job outputs rather
+than tag-push triggers. The library has `git_release_enable = false`, so it gets
+a tag + crates.io publish + CHANGELOG but no (redundant, assetless) GitHub
+release. A manual/emergency path remains via `workflow_dispatch` with a `vX.Y.Z`
+tag input. Do not add code signing or notarization unless explicitly requested.
+Release assets must stay in sync with `koban update` asset names and
 `install.sh`, and each release must publish `SHA256SUMS`. crates.io publishing
-must remain gated on `CARGO_REGISTRY_TOKEN`, publishing the `koban` library
-before `koban-cli`. Repository Actions workflow permissions must allow read/write
-tokens and GitHub Actions PR creation so release-please can open release PRs.
+must remain gated on `CARGO_REGISTRY_TOKEN`. release-plz authenticates with
+`RELEASE_PLEASE_TOKEN` (a PAT) so its release PR triggers the `pull_request` CI;
+repository Actions permissions must allow read/write tokens and GitHub Actions PR
+creation.
 
 Nightly automation lives in `.github/workflows/nightly.yml`. It builds current
 `main` into a rolling `nightly` prerelease through `nightly-staging`, then

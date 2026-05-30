@@ -1,0 +1,224 @@
+name: Release Plz
+
+# release-plz owns the release PR (with the correct version), the per-package git
+# tags, and crates.io publishing. The binary build + GitHub release jobs below run
+# after release-plz tags a CLI release (gated on its job outputs — no reliance on
+# tag-push cross-triggering). `workflow_dispatch` keeps a manual/emergency path
+# that builds and publishes a release for an explicit `vX.Y.Z` tag.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and publish, creating it from this ref if needed (for example v0.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-plz-release:
+    name: Release (tag + crates.io)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      # The koban-cli release carries the prefix-free `vX.Y.Z` tag and binary
+      # assets; empty when this push did not release the CLI.
+      cli_tag: ${{ steps.cli.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz
+        id: release-plz
+        uses: release-plz/action@v0
+        with:
+          command: release
+        env:
+          # A PAT (RELEASE_PLEASE_TOKEN, reused from the release-please setup)
+          # lets release-plz's tags/releases trigger downstream workflows and is
+          # the same token the PR job needs; falls back to GITHUB_TOKEN.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Derive CLI release tag
+        id: cli
+        env:
+          RELEASES: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          set -euo pipefail
+          tag=$(printf '%s' "${RELEASES:-[]}" \
+            | jq -r '[.[] | select(.package_name == "koban-cli") | .tag][0] // empty')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ -n "$tag" ]; then
+            echo "release-plz released koban-cli as $tag"
+          else
+            echo "No koban-cli release on this push."
+          fi
+
+  release-plz-pr:
+    name: Release PR
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-pr-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz
+        uses: release-plz/action@v0
+        with:
+          command: release-pr
+        env:
+          # The PAT is required here so the release PR triggers the `pull_request`
+          # CI workflow (the default GITHUB_TOKEN cannot trigger other workflows).
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  resolve-tag:
+    name: Resolve Tag
+    runs-on: ubuntu-latest
+    needs: release-plz-release
+    if: >-
+      always() && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && needs.release-plz-release.outputs.cli_tag != '')
+      )
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          fetch-depth: 0
+
+      - id: resolve
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+          CLI_TAG: ${{ needs.release-plz-release.outputs.cli_tag }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="$TAG_INPUT"
+            if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Release tag must look like vX.Y.Z; got '$TAG'"
+              exit 1
+            fi
+
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+              echo "Using existing tag $TAG"
+            else
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git tag "$TAG" "$GITHUB_SHA"
+              git push origin "refs/tags/$TAG"
+              echo "Created tag $TAG at $GITHUB_SHA"
+            fi
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          else
+            # On push, release-plz already created the CLI tag during release.
+            echo "tag=$CLI_TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: resolve-tag
+    if: needs.resolve-tag.result == 'success' && needs.resolve-tag.outputs.tag != ''
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            asset: koban-aarch64-apple-darwin.tar.gz
+          - os: macos-14
+            target: x86_64-apple-darwin
+            asset: koban-x86_64-apple-darwin.tar.gz
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            asset: koban-x86_64-unknown-linux-gnu.tar.gz
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            asset: koban-aarch64-unknown-linux-gnu.tar.gz
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+          cache-on-failure: true
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} --locked
+
+      - name: Strip binary
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            strip target/${{ matrix.target }}/release/koban
+          else
+            strip --strip-all target/${{ matrix.target }}/release/koban
+          fi
+
+      - name: Package
+        run: tar -czf ${{ matrix.asset }} -C target/${{ matrix.target }}/release koban
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.asset }}
+
+  publish-release:
+    name: Publish GitHub release
+    needs: [resolve-tag, build]
+    if: needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: cd artifacts && sha256sum *.tar.gz > SHA256SUMS
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.resolve-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" --draft --title "$TAG" --generate-notes --repo "$GITHUB_REPOSITORY"
+          fi
+          gh release upload "$TAG" artifacts/*.tar.gz artifacts/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"

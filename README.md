@@ -454,12 +454,14 @@ both x86_64 and aarch64.
 
 ## Releases
 
-Releases are managed by release-please across the workspace, keeping the `koban`
-library and `koban-cli` binary crates on a single linked version. When a release
-is cut, CI builds unsigned CLI tarballs for macOS and Linux, uploads
-`SHA256SUMS`, and publishes both crates to crates.io (library first, then the
-CLI) using `CARGO_REGISTRY_TOKEN`. The binary release keeps the prefix-free
-`vX.Y.Z` tag that `install.sh` and `koban update` rely on.
+Releases are managed by [release-plz](https://release-plz.dev) across the
+workspace. The `koban` library and `koban-cli` binary crates version
+independently — each bumps only when its own code changes. release-plz opens the
+release PR, tags the release, and publishes both crates to crates.io (library
+first, then the CLI) using `CARGO_REGISTRY_TOKEN`. When a CLI release is tagged,
+CI builds unsigned CLI tarballs for macOS and Linux and uploads them with
+`SHA256SUMS`. The CLI release keeps the prefix-free `vX.Y.Z` tag (the library
+uses `koban-v*`) that `install.sh` and `koban update` rely on.
 
 The nightly workflow builds the current `main` branch into a rolling
 `nightly` prerelease. It uses a `nightly-staging` release while compiling so
