@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/jamesbrink/koban/compare/v0.2.0...v0.3.0) (2026-05-30)
+
+
+### Features
+
+* **skill:** add OpenClaw skill target ([#24](https://github.com/jamesbrink/koban/issues/24)) ([6ddafae](https://github.com/jamesbrink/koban/commit/6ddafae603168aa18988805cd00eb92347b5e810))
+* **skill:** document how to install the koban binary ([#28](https://github.com/jamesbrink/koban/issues/28)) ([07fcf41](https://github.com/jamesbrink/koban/commit/07fcf41268d7662b647f2e65360d8c2f47d56c7b))
+
 ## [0.2.0](https://github.com/jamesbrink/koban/compare/v0.1.0...v0.2.0) (2026-05-29)
 
 
