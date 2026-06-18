@@ -1,10 +1,10 @@
 # Changelog
 
-## [0.3.2](https://github.com/jamesbrink/koban/compare/v0.3.1...v0.3.2) - 2026-06-18
+## [0.3.2](https://github.com/jamesbrink/koban/compare/v0.3.1...v0.3.2) (2026-06-18)
 
-### <!-- 0 -->Features
+### Features
 
-- *(skill)* simplify agent skill installation
+* **skill:** simplify agent skill installation
 
 ## [0.3.0](https://github.com/jamesbrink/koban/compare/v0.2.0...v0.3.0) (2026-05-30)
 
