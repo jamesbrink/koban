@@ -65,12 +65,12 @@ they are added. See the full breakdown in the
 koban --version
 koban --help
 koban auth login
-koban skill install --target claude-code
+koban skill install --project
 koban update --check
 koban completions zsh
 ```
 
 - [`koban auth`](/commands/auth) — store, inspect, and remove credentials.
-- [`koban skill`](/commands/skill) — generate or install the agent skill.
+- [`koban skill`](/commands/skill) — install, list, show, and uninstall the agent skill.
 - [`koban update`](/guide/updating) — self-update from GitHub releases.
 - [`koban completions`](/guide/completions) — shell completion scripts.

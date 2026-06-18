@@ -41,7 +41,7 @@ pub async fn execute(cli: Cli) -> Result<String> {
             nightly,
         }) => update::run(check, force, tag, nightly),
         // Auth and skill commands run without a resolved token: login is how a
-        // token is obtained, and the skill generator describes the CLI offline.
+        // token is obtained, and skill management describes the CLI offline.
         Some(Commands::Auth(command)) => auth::execute(output, command).await,
         Some(Commands::Skill(command)) => skill::execute(output, command),
         command => {

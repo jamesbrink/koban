@@ -45,60 +45,103 @@ pub struct AuthLoginArgs {
     pub no_verify: bool,
 }
 
-/// Subcommands for emitting the koban agent skill.
+/// Subcommands for managing the koban agent skill.
 #[derive(Debug, Subcommand)]
 #[command(after_help = "\
 Examples:
-  koban skill generate
-  koban skill install --target claude-code
-  koban skill install --global --target all")]
+  koban skill install
+  koban skill install --project
+  koban skill install claude codex
+  koban skill list
+  koban skill show")]
 pub enum SkillCommand {
-    /// Write skill files to a directory for review (default ./koban-skills)
-    Generate(SkillArgs),
+    /// List supported agents, their skill paths, and install status
+    List(SkillListArgs),
 
-    /// Write skill files into live harness configuration locations
-    Install(SkillArgs),
+    /// Install the koban skill (user-wide by default, --project for project-level)
+    Install(SkillInstallArgs),
+
+    /// Remove installed koban skills
+    Uninstall(SkillUninstallArgs),
+
+    /// Print the embedded SKILL.md to stdout
+    Show,
+
+    /// Deprecated alias for `show`/`install`: write a review copy under a directory
+    #[command(hide = true)]
+    Generate(SkillGenerateArgs),
 }
 
 #[derive(Debug, Args)]
-pub struct SkillArgs {
-    /// Harness targets to emit (repeatable). Defaults to `all`
-    #[arg(long, value_enum, default_value = "all", action = clap::ArgAction::Append)]
-    pub target: Vec<SkillTarget>,
+pub struct SkillListArgs {
+    /// Use plain ASCII separators instead of Unicode table borders
+    #[arg(long)]
+    pub ascii: bool,
+}
 
-    /// Output root (generate) or base directory override (install)
+#[derive(Debug, Args)]
+pub struct SkillInstallArgs {
+    /// Agents to install for (default: detected agents, or claude + agents for project installs)
+    #[arg(value_enum)]
+    pub agents: Vec<SkillAgent>,
+
+    /// Install into project-level skill directories under the current directory
+    #[arg(long)]
+    pub project: bool,
+
+    /// Project directory to install into (implies --project)
     #[arg(long, value_name = "PATH")]
     pub dir: Option<PathBuf>,
 
-    /// Install into the user-level config (home) instead of the current project
-    #[arg(long)]
-    pub global: bool,
-
-    /// Overwrite existing files
-    #[arg(long)]
-    pub force: bool,
+    /// Install for every supported agent regardless of detection
+    #[arg(long, conflicts_with = "agents")]
+    pub all: bool,
 }
 
-/// AI harness targets the skill generator knows how to emit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum SkillTarget {
-    /// Claude Code (`.claude/skills/koban/SKILL.md`)
-    ClaudeCode,
-    /// OpenAI Codex CLI / pi (`.agents/skills/koban/SKILL.md`)
+#[derive(Debug, Args)]
+pub struct SkillUninstallArgs {
+    /// Agents to uninstall from (default: every known path in scope)
+    #[arg(value_enum)]
+    pub agents: Vec<SkillAgent>,
+
+    /// Remove from project-level skill directories under the current directory
+    #[arg(long)]
+    pub project: bool,
+
+    /// Project directory to uninstall from (implies --project)
+    #[arg(long, value_name = "PATH")]
+    pub dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub struct SkillGenerateArgs {
+    /// Output root for the generated review copy
+    #[arg(long, value_name = "PATH", default_value = "koban-skills")]
+    pub dir: PathBuf,
+}
+
+/// AI coding agents with known Agent Skills directories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum SkillAgent {
+    /// Claude Code (~/.claude/skills, .claude/skills)
+    Claude,
+    /// OpenAI Codex CLI (~/.codex/skills, .agents/skills)
     Codex,
-    /// pi coding agent (`.pi/skills/koban/SKILL.md`)
+    /// pi coding agent (~/.pi/agent/skills, .pi/skills)
     Pi,
-    /// AGENTS.md block (Cursor, Windsurf, Gemini, Aider, Copilot, Zed, ...)
-    AgentsMd,
-    /// Claude Desktop upload bundle (`koban.zip`)
-    ClaudeDesktop,
-    /// Cursor project rule (`.cursor/rules/koban.mdc`)
-    Cursor,
-    /// OpenClaw skill (`skills/koban/SKILL.md`, or `~/.openclaw/skills/...`)
+    /// OpenClaw (~/.openclaw/skills, skills/)
     #[value(name = "openclaw", alias = "open-claw")]
     OpenClaw,
-    /// Claude Code plugin (`.claude-plugin/plugin.json` + skill)
-    Plugin,
-    /// claude-code + codex + agents-md (the practical default bundle)
-    All,
+    /// GitHub Copilot CLI (~/.copilot/skills, .github/skills)
+    Copilot,
+    /// Cursor (~/.cursor/skills, .agents/skills)
+    Cursor,
+    /// Gemini CLI (~/.gemini/skills, .agents/skills)
+    Gemini,
+    /// Amp (~/.config/amp/skills, .agents/skills)
+    Amp,
+    /// Goose (~/.config/goose/skills, .agents/skills)
+    Goose,
+    /// Generic cross-agent directory (~/.agents/skills, .agents/skills)
+    Agents,
 }

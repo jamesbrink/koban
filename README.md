@@ -71,9 +71,10 @@ koban is built to be driven by AI coding agents. One command teaches your agent
 the whole CLI:
 
 ```sh
-koban skill install --target all          # Claude Code, Codex, and an AGENTS.md block
-koban skill install --target claude-code  # or pick a single harness
-koban skill generate                      # write to ./koban-skills to review first
+koban skill install                       # user-wide for detected agents
+koban skill install --project             # repo-local .claude + .agents copies
+koban skill install claude codex          # or pick specific agents
+koban skill list                          # show paths and install status
 ```
 
 Once the skill is installed, an agent can **track your work in Invoice Ninja
@@ -83,9 +84,9 @@ works, instead of you context-switching to the web UI. The skill teaches the
 agent koban's stable JSON output and its `--dry-run`/`--yes` safety gates, so
 every write is previewed before it happens.
 
-Supported harnesses include Claude Code, OpenAI Codex CLI, pi, Cursor, OpenClaw,
-Claude Desktop, and any tool that reads `AGENTS.md` (Windsurf, Gemini CLI, Aider,
-Copilot, Zed, …). See the
+Supported harnesses include Claude Code, OpenAI Codex CLI, pi, OpenClaw,
+GitHub Copilot CLI, Cursor, Gemini CLI, Amp, Goose, and generic Agent Skills
+readers via `.agents/skills`. See the
 [agent skill docs](https://jamesbrink.online/koban/commands/skill).
 
 ## Current CLI
@@ -107,13 +108,13 @@ koban auth status
 koban auth logout
 
 # Agent skill (teach Claude Code, Codex, pi, Cursor, ... how to drive koban)
-koban skill generate                       # write to ./koban-skills for review
-koban skill install --target claude-code   # into ./.claude/skills/koban
-koban skill install --global --target all  # into ~/.claude, ~/.agents, AGENTS.md
-koban skill install --target openclaw       # into ./skills/koban (OpenClaw workspace)
-# OpenClaw users can also install straight from Git:
-#   openclaw skills install git:jamesbrink/koban
-koban skill install --target claude-desktop # build koban.zip to upload
+koban skill install                        # user-wide for detected agents
+koban skill install --project              # into ./.claude/skills + ./.agents/skills
+koban skill install claude codex           # target specific agents
+koban skill install --all                  # every supported agent path
+koban skill list                           # paths and install status
+koban skill show                           # print the embedded SKILL.md
+koban skill uninstall --project            # remove project-level installed copies
 ```
 
 Credentials resolve in this order, so agents and CI stay deterministic:
