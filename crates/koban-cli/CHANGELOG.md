@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.2](https://github.com/jamesbrink/koban/compare/v0.3.1...v0.3.2) (2026-06-18)
+## [0.3.2](https://github.com/jamesbrink/koban/compare/v0.3.0...v0.3.2) (2026-06-18)
 
 ### Features
 
