@@ -21,9 +21,9 @@ hero:
 
 features:
   - title: Drop-in agent skill
-    details: koban skill install teaches Claude Code, Codex, Cursor, and any
-      AGENTS.md-aware tool to drive koban — so your agent tracks work in Invoice
-      Ninja automatically, with guarded writes it always previews first.
+    details: koban skill install teaches detected Agent Skills-aware tools to
+      drive koban — so your agent tracks work in Invoice Ninja automatically,
+      with guarded writes it always previews first.
   - title: One durable command shape
     details:
       Every resource family follows the same verbs — list, show, template,
@@ -89,14 +89,15 @@ async fn main() -> koban::Result<()> {
 Install koban as a skill and your coding agent drives it for you:
 
 ```sh
-koban skill install --target all
+koban skill install
 ```
 
 Now an agent can log billable tasks and time, draft and send invoices, record
 expenses, and report on outstanding balances in Invoice Ninja **as it works** —
 using koban's stable JSON and its `--dry-run`/`--yes` safety gates so every
-write is previewed first. Works with Claude Code, OpenAI Codex CLI, pi, Cursor,
-Claude Desktop, and any `AGENTS.md`-aware tool.
+write is previewed first. Works with Claude Code, OpenAI Codex CLI, pi,
+OpenClaw, GitHub Copilot CLI, Cursor, Gemini CLI, Amp, Goose, and generic
+`.agents/skills` readers.
 
 [Read the agent skill guide →](/commands/skill)
 

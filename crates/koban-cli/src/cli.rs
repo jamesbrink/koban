@@ -4,7 +4,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 // Cohesive types extracted to keep this module focused and within budget;
 // re-exported so `crate::cli::{AuthCommand, CompletionShell, ...}` stays stable.
-pub use crate::cli_agent::{AuthCommand, AuthLoginArgs, SkillArgs, SkillCommand, SkillTarget};
+pub use crate::cli_agent::{
+    AuthCommand, AuthLoginArgs, SkillAgent, SkillCommand, SkillGenerateArgs, SkillInstallArgs,
+    SkillListArgs, SkillUninstallArgs,
+};
 pub use crate::completion::CompletionShell;
 
 #[derive(Debug, Parser)]
@@ -225,7 +228,7 @@ Examples:
     #[command(subcommand)]
     Auth(AuthCommand),
 
-    /// Generate or install an agent skill that teaches a harness to use koban
+    /// Install, list, show, and uninstall the agent skill that teaches koban
     #[command(subcommand)]
     Skill(SkillCommand),
 
