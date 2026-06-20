@@ -6,20 +6,22 @@ Library functions return `koban::Result<T>`, an alias for
 `std::result::Result<T, KobanError>`. `KobanError` is a `thiserror` enum with one
 variant per failure mode:
 
-| Variant                | When it occurs                                           |
-| ---------------------- | -------------------------------------------------------- |
-| `MissingToken`         | `INVOICE_NINJA_API_TOKEN` is not configured.             |
-| `InvalidBaseUrl`       | The base URL could not be parsed.                        |
-| `InsecureBaseUrl`      | The base URL is not HTTPS (and is not a local host).     |
-| `InvalidEndpoint`      | An API URL could not be built for a path.                |
-| `Transport`            | The request could not reach Invoice Ninja.               |
-| `Api`                  | Invoice Ninja returned a non-success HTTP status.        |
-| `Decode`               | A response could not be decoded into the expected shape. |
-| `InvalidFilter`        | A list filter value was rejected.                        |
-| `InvalidPayload`       | A write payload failed validation.                       |
-| `ConfirmationRequired` | A guarded operation needs explicit confirmation.         |
-| `File`                 | A download file could not be written.                    |
-| `Update`               | A self-update step failed.                               |
+| Variant                | When it occurs                                             |
+| ---------------------- | ---------------------------------------------------------- |
+| `MissingToken`         | `INVOICE_NINJA_API_TOKEN` is not configured.               |
+| `InvalidBaseUrl`       | The base URL could not be parsed.                          |
+| `InsecureBaseUrl`      | The base URL is not HTTPS (and is not a local host).       |
+| `InvalidEndpoint`      | An API URL could not be built for a path.                  |
+| `Transport`            | The request could not reach Invoice Ninja.                 |
+| `Api`                  | Invoice Ninja returned a non-success HTTP status.          |
+| `Decode`               | A response could not be decoded into the expected shape.   |
+| `InvalidFilter`        | A list filter value was rejected.                          |
+| `InvalidPayload`       | A write payload failed validation.                         |
+| `InvalidRequest`       | A request was rejected (e.g. payload on a GET-only route). |
+| `ConfirmationRequired` | A guarded operation needs explicit confirmation.           |
+| `File`                 | A download file could not be written.                      |
+| `Update`               | A self-update step failed.                                 |
+| `Credential`           | A stored credential could not be read or written.          |
 
 Tokens are never embedded in error messages — the `redact` helper is used to
 strip them from any text that might contain one.
