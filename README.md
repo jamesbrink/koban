@@ -99,6 +99,8 @@ koban completions zsh
 koban completions bash
 koban completions fish
 koban completions nushell
+koban completions elvish
+koban completions powershell
 
 # Authentication (stores the token in a 0600 config file or the OS keychain)
 koban auth login --token <token>

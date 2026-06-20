@@ -32,18 +32,18 @@ when it is empty.
 
 ## Supported agents
 
-| Agent name | User-wide skill directory      | Project skill directory |
-| ---------- | ------------------------------ | ----------------------- |
-| `claude`   | `~/.claude/skills/`            | `.claude/skills/`       |
-| `codex`    | `~/.codex/skills/`             | `.agents/skills/`       |
-| `pi`       | `~/.pi/agent/skills/`          | `.pi/skills/`           |
-| `openclaw` | `~/.openclaw/skills/`          | `skills/`               |
-| `copilot`  | `~/.copilot/skills/`           | `.github/skills/`       |
-| `cursor`   | `~/.cursor/skills/`            | `.agents/skills/`       |
-| `gemini`   | `~/.gemini/skills/`            | `.agents/skills/`       |
-| `amp`      | `~/.config/amp/skills/`        | `.agents/skills/`       |
-| `goose`    | `~/.config/goose/skills/`      | `.agents/skills/`       |
-| `agents`   | `~/.agents/skills/`            | `.agents/skills/`       |
+| Agent name | User-wide skill directory | Project skill directory |
+| ---------- | ------------------------- | ----------------------- |
+| `claude`   | `~/.claude/skills/`       | `.claude/skills/`       |
+| `codex`    | `~/.codex/skills/`        | `.agents/skills/`       |
+| `pi`       | `~/.pi/agent/skills/`     | `.pi/skills/`           |
+| `openclaw` | `~/.openclaw/skills/`     | `skills/`               |
+| `copilot`  | `~/.copilot/skills/`      | `.github/skills/`       |
+| `cursor`   | `~/.cursor/skills/`       | `.agents/skills/`       |
+| `gemini`   | `~/.gemini/skills/`       | `.agents/skills/`       |
+| `amp`      | `~/.config/amp/skills/`   | `.agents/skills/`       |
+| `goose`    | `~/.config/goose/skills/` | `.agents/skills/`       |
+| `agents`   | `~/.agents/skills/`       | `.agents/skills/`       |
 
 Agents that share a directory are deduplicated, so for example:
 
