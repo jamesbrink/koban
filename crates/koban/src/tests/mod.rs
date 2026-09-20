@@ -12,3 +12,4 @@ use crate::{
 mod api;
 mod config;
 mod models;
+mod redirect;

@@ -15,9 +15,26 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new(config: Config) -> Self {
+        // The API token travels in the custom `X-API-TOKEN` header, which
+        // reqwest's redirect handling never strips (unlike `Authorization`),
+        // so a cross-origin redirect would forward the token to the other
+        // host. Follow redirects only within the configured origin.
+        let base_origin = config.base_url.origin();
+        let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() > 10 {
+                attempt.error("too many redirects")
+            } else if attempt.url().origin() == base_origin {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        });
         Self {
             config,
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .redirect(redirect_policy)
+                .build()
+                .expect("reqwest client"),
         }
     }
 
