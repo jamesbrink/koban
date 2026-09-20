@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2](https://github.com/jamesbrink/koban/compare/koban-v0.2.1...koban-v0.2.2) - 2026-09-20
+
+### <!-- 1 -->Bug Fixes
+
+- restrict redirects to configured origin so X-API-TOKEN is not forwarded cross-origin ([#37](https://github.com/jamesbrink/koban/pull/37))
+
 ## [0.2.0](https://github.com/jamesbrink/koban/compare/koban-v0.1.0...koban-v0.2.0) (2026-05-29)
 
 
